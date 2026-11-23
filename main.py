@@ -62,15 +62,18 @@ def gerar_resposta_comercial(nome_cliente, mensagem):
     if intencao == "SOLICITACAO_PIX":
         resposta = (
             f"{saudacao}\n\n"
-            f"🔑 *CHAVE PIX OFICIAL DO JONAS (Copia e Cola):*\n\n"
+            f"🔑 *CHAVE PIX OFICIAL (MERCADO PAGO IP S.A.):*\n\n"
             f"`{CHAVE_PIX_OFICIAL}`\n\n"
+            f"🏛️ *Banco:* Mercado Pago IP S.A.\n"
+            f"👤 *Titular:* Jonas Mendonça\n"
+            f"⚡ *Tipo:* Chave Aleatória (Copia e Cola Instantâneo)\n\n"
             f"💰 *Tabela de Valores Oficiais:*\n"
             f"• 📺 *CinePro TV (30 dias de acesso 780 canais):* R$ 30,00\n"
             f"• 🏪 *Sistema Comercial PDV & Estoque:* R$ 150,00\n"
             f"• ⚡ *Suíte Windows Boost PRO:* R$ 150,00 (ou LITE R$ 30,00)\n"
             f"• 🤖 *Implantação Robô WhatsApp 24/7:* R$ 250,00\n"
             f"• 🔥 *Super Combo Comércio 3 em 1:* R$ 350,00\n\n"
-            f"✅ *Instruções:* Após realizar o PIX no seu banco, envie o comprovante nesta mesma conversa para liberarmos o seu acesso na hora!"
+            f"✅ *Instruções:* Após realizar o PIX no aplicativo do seu banco, envie o comprovante nesta mesma conversa para liberarmos o seu acesso na hora!"
         )
     elif intencao == "TESTE_CINEPRO_IPTV":
         resposta = (
@@ -185,7 +188,8 @@ def webhook_whatsapp():
                     f"Olá, {nome}! Seu teste grátis de 2 horas está chegando ao fim! ⏳\n"
                     f"O que achou da variedade dos 780+ canais?\n\n"
                     f"Para continuar assistindo o mês inteiro sem nenhuma interrupção, nosso plano mensal é de apenas *R$ 30,00 no PIX*.\n\n"
-                    f"🔑 *Chave PIX Oficial (Copia e Cola):*\n`{CHAVE_PIX_OFICIAL}`\n\n"
+                    f"🔑 *Chave PIX Mercado Pago (Copia e Cola):*\n`{CHAVE_PIX_OFICIAL}`\n"
+                    f"🏛️ *Banco:* Mercado Pago IP S.A. | Titular: Jonas Mendonça\n\n"
                     f"Assim que fizer o PIX, envie o comprovante aqui para liberarmos seu acesso mensal completo!"
                 )
 
