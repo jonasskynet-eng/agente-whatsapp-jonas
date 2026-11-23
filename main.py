@@ -35,8 +35,10 @@ def classificar_intencao(texto):
         return "SISTEMA_COMERCIAL"
     elif any(p in t for p in ["video", "dark", "canal", "youtube", "tiktok", "reels"]):
         return "FABRICA_DARK"
-    elif any(p in t for p in ["rastreador", "concorrente", "mercado livre", "shopee", "preço", "preco"]):
+    elif any(p in t for p in ["rastreador", "concorrente", "espiao", "preço", "preco"]):
         return "RASTREADOR_PRECOS"
+    elif any(p in t for p in ["achadinho", "achados", "promoção", "promocao", "oferta", "desconto", "recomenda", "comprar", "afiliado", "mercado livre", "loja"]):
+        return "OFERTAS_AFILIADO"
     else:
         return "ATENDIMENTO_GERAL"
 
@@ -71,14 +73,25 @@ def gerar_resposta_comercial(nome_cliente, mensagem):
             f"📈 Te avisa no WhatsApp assim que seu concorrente mexer no preço ou o estoque dele acabar;\n"
             f"💰 Mensalidade de apenas R$ 90/mês para monitorar seus principais produtos."
         )
+    elif intencao == "OFERTAS_AFILIADO":
+        resposta = (
+            f"{saudacao}\n\n"
+            f"🛍️ *Achadinhos e Ofertas Recomendadas no Mercado Livre!*\n\n"
+            f"Separamos as melhores oportunidades verificadas e com até 50% de desconto:\n"
+            f"👉 *Vitrine Oficial do Jonas:* https://www.mercadolivre.com.br/social/detonadormendona\n\n"
+            f"🔥 *Achadinho em Destaque:* Inversor 1000W Onda Senoidal Pura 12V/220V\n"
+            f"🔗 *Link direto com desconto:* https://meli.la/2Uuzpmf\n\n"
+            f"Qual produto ou ferramenta você precisa hoje? Me diga que busco o melhor link para você!"
+        )
     else:
         resposta = (
             f"{saudacao}\n\n"
             f"Como posso ajudar o seu negócio hoje?\n\n"
             f"1️⃣ Sistema Comercial de Estoque e Vendas (R$ 150)\n"
             f"2️⃣ Produção de Vídeos Virais Dark para Redes Sociais\n"
-            f"3️⃣ Rastreador de Preços de Concorrentes\n\n"
-            f"Digite o número da opção desejada!"
+            f"3️⃣ Rastreador de Preços de Concorrentes\n"
+            f"4️⃣ Achadinhos e Ofertas Verificadas (Mercado Livre)\n\n"
+            f"Digite o número ou me diga o que procura!"
         )
 
     return intencao, resposta
