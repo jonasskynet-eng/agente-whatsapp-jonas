@@ -31,14 +31,18 @@ except Exception as e:
 
 def classificar_intencao(texto):
     t = texto.lower()
-    if any(p in t for p in ["sistema", "estoque", "caixa", "150", "caderno", "mercado"]):
-        return "SISTEMA_COMERCIAL"
+    # 1. Ofertas e Afiliado Mercado Livre (checar antes de 'mercado' genérico)
+    if any(p in t for p in ["achadinho", "achados", "promoção", "promocao", "oferta", "desconto", "recomenda", "comprar", "afiliado", "mercado livre", "loja online"]):
+        return "OFERTAS_AFILIADO"
+    # 2. Fabrica Dark
     elif any(p in t for p in ["video", "dark", "canal", "youtube", "tiktok", "reels"]):
         return "FABRICA_DARK"
+    # 3. Rastreador de Precos E-commerce
     elif any(p in t for p in ["rastreador", "concorrente", "espiao", "preço", "preco"]):
         return "RASTREADOR_PRECOS"
-    elif any(p in t for p in ["achadinho", "achados", "promoção", "promocao", "oferta", "desconto", "recomenda", "comprar", "afiliado", "mercado livre", "loja"]):
-        return "OFERTAS_AFILIADO"
+    # 4. Sistema Comercial R$ 150
+    elif any(p in t for p in ["sistema", "estoque", "caixa", "150", "caderno", "comercial", "mercadinho", "mercado"]):
+        return "SISTEMA_COMERCIAL"
     else:
         return "ATENDIMENTO_GERAL"
 
