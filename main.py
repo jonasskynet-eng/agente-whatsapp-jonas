@@ -31,16 +31,19 @@ except Exception as e:
 
 def classificar_intencao(texto):
     t = texto.lower()
-    # 1. Ofertas e Afiliado Mercado Livre (checar antes de 'mercado' genérico)
-    if any(p in t for p in ["achadinho", "achados", "promoção", "promocao", "oferta", "desconto", "recomenda", "comprar", "afiliado", "mercado livre", "loja online"]):
+    # 1. Teste de IPTV / CinePro TV (2 Horas + Acompanhamento 15 min)
+    if any(p in t for p in ["iptv", "cinepro", "cine pro", "teste tv", "teste de tv", "canais", "canal", "futebol", "filme", "série", "serie", "assistir tv"]):
+        return "TESTE_CINEPRO_IPTV"
+    # 2. Ofertas e Afiliado Mercado Livre (checar antes de 'mercado' genérico)
+    elif any(p in t for p in ["achadinho", "achados", "promoção", "promocao", "oferta", "desconto", "recomenda", "comprar", "afiliado", "mercado livre", "loja online"]):
         return "OFERTAS_AFILIADO"
-    # 2. Fabrica Dark
+    # 3. Fabrica Dark
     elif any(p in t for p in ["video", "dark", "canal", "youtube", "tiktok", "reels"]):
         return "FABRICA_DARK"
-    # 3. Rastreador de Precos E-commerce
+    # 4. Rastreador de Precos E-commerce
     elif any(p in t for p in ["rastreador", "concorrente", "espiao", "preço", "preco"]):
         return "RASTREADOR_PRECOS"
-    # 4. Sistema Comercial R$ 150
+    # 5. Sistema Comercial R$ 150
     elif any(p in t for p in ["sistema", "estoque", "caixa", "150", "caderno", "comercial", "mercadinho", "mercado"]):
         return "SISTEMA_COMERCIAL"
     else:
@@ -50,7 +53,18 @@ def gerar_resposta_comercial(nome_cliente, mensagem):
     intencao = classificar_intencao(mensagem)
     saudacao = f"Olá, {nome_cliente}! Tudo bem? Aqui é o atendimento automático da Jonas Tech Solutions."
 
-    if intencao == "SISTEMA_COMERCIAL":
+    if intencao == "TESTE_CINEPRO_IPTV":
+        resposta = (
+            f"{saudacao}\n\n"
+            f"📺 *SEU TESTE GRÁTIS DE 2 HORAS DO CINEPRO TV ESTÁ LIBERADO!*\n\n"
+            f"Mais de 780 canais em Full HD, filmes, séries e futebol sem travar.\n\n"
+            f"🔗 *Acesse agora pelo link abaixo:*\n"
+            f"👉 https://jonasskynet-eng.github.io/cine-pro-tv-2026/\n\n"
+            f"⏰ *Duração:* 2 horas completas a partir de agora!\n"
+            f"💡 *Como usar:* Abra direto no navegador do seu celular, computador ou Smart TV.\n\n"
+            f"Daqui a 15 minutinhos vou te mandar uma mensagem rápida para saber se a imagem abriu perfeita aí pra você! Bom divertimento!"
+        )
+    elif intencao == "SISTEMA_COMERCIAL":
         resposta = (
             f"{saudacao}\n\n"
             f"Perfeito! Nosso *Sistema Comercial de Gestão & Estoque* foi desenhado para quem quer sair do caderno e ter controle total:\n"
@@ -90,12 +104,13 @@ def gerar_resposta_comercial(nome_cliente, mensagem):
     else:
         resposta = (
             f"{saudacao}\n\n"
-            f"Como posso ajudar o seu negócio hoje?\n\n"
-            f"1️⃣ Sistema Comercial de Estoque e Vendas (R$ 150)\n"
-            f"2️⃣ Produção de Vídeos Virais Dark para Redes Sociais\n"
-            f"3️⃣ Rastreador de Preços de Concorrentes\n"
-            f"4️⃣ Achadinhos e Ofertas Verificadas (Mercado Livre)\n\n"
-            f"Digite o número ou me diga o que procura!"
+            f"Como posso ajudar você hoje?\n\n"
+            f"1️⃣ 📺 Teste Grátis de 2 Horas de TV (CinePro TV 2026)\n"
+            f"2️⃣ 🏪 Sistema Comercial PDV & Estoque (R$ 150 no PIX)\n"
+            f"3️⃣ 🛍️ Achadinhos e Ofertas Oficiais do Mercado Livre\n"
+            f"4️⃣ 🎬 Produção de Vídeos Virais Dark para Redes Sociais\n"
+            f"5️⃣ 📈 Rastreador de Preços de Concorrentes\n\n"
+            f"👉 Digite o número ou me diga o que você precisa!"
         )
 
     return intencao, resposta
@@ -129,16 +144,34 @@ def webhook_whatsapp():
     # Registro do Lead no MongoDB Atlas
     if leads_col is not None:
         try:
+            update_data = {
+                "nome": nome,
+                "intencao": intencao,
+                "ultima_mensagem": mensagem,
+                "resposta": resposta,
+                "status": "ATENDIDO_NUVEM_24H",
+                "atualizado_em": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            }
+
+            # Se for teste de IPTV, registra a regua de 2 horas + 15 min de satisfacao
+            if intencao == "TESTE_CINEPRO_IPTV":
+                update_data["teste_iptv_ativo"] = True
+                update_data["teste_iniciado_em"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                update_data["etapa_teste"] = "INICIADO_2_HORAS"
+                update_data["msg_15min_satisfacao"] = (
+                    f"Fala, {nome}! Passando aqui com 15 minutinhos de teste:\n"
+                    f"A imagem dos canais abriu perfeita aí na sua tela? Travou alguma coisa ou rodou liso?"
+                )
+                update_data["msg_fechamento_compra"] = (
+                    f"Olá, {nome}! Seu teste grátis de 2 horas está chegando ao fim! ⏳\n"
+                    f"O que achou da variedade dos 780+ canais?\n"
+                    f"Para continuar assistindo o mês inteiro sem nenhuma interrupção, nosso plano mensal é de apenas *R$ 30,00 no PIX*.\n"
+                    f"Posso te mandar a chave PIX agora para liberar seu acesso mensal?"
+                )
+
             leads_col.update_one(
                 {"telefone": telefone},
-                {"$set": {
-                    "nome": nome,
-                    "intencao": intencao,
-                    "ultima_mensagem": mensagem,
-                    "resposta": resposta,
-                    "status": "ATENDIDO_NUVEM_24H",
-                    "atualizado_em": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                }},
+                {"$set": update_data},
                 upsert=True
             )
         except Exception as e:
