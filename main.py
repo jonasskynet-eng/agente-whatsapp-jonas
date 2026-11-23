@@ -13,6 +13,9 @@ from pymongo.server_api import ServerApi
 
 app = Flask(__name__)
 
+# CONFIGURACOES GERAIS & CHAVE PIX OFICIAL DO JONAS
+CHAVE_PIX_OFICIAL = "324588e6-bd74-4b6d-9951-5321cc50ea5a"
+
 # CONFIGURACOES DO BANCO DE DADOS NA NUVEM (MONGODB ATLAS)
 USUARIO = os.getenv("MONGO_USER", "jonasskynet_db_user")
 SENHA_BRUTA = os.getenv("MONGO_PASS", "nk1NBq5GW3WJmg4v")
@@ -31,8 +34,11 @@ except Exception as e:
 
 def classificar_intencao(texto):
     t = texto.lower()
-    # 1. Teste de IPTV / CinePro TV (2 Horas + Acompanhamento 15 min)
-    if any(p in t for p in ["iptv", "cinepro", "cine pro", "teste tv", "teste de tv", "canais", "canal", "futebol", "filme", "série", "serie", "assistir tv"]):
+    # 1. Pedido de Chave PIX ou Pagamento
+    if any(p in t for p in ["pix", "chave pix", "pagar", "pagamento", "comprovante", "dados bancarios", "chave"]):
+        return "SOLICITACAO_PIX"
+    # 2. Teste de IPTV / CinePro TV (2 Horas + Acompanhamento 15 min)
+    elif any(p in t for p in ["iptv", "cinepro", "cine pro", "teste tv", "teste de tv", "canais", "canal", "futebol", "filme", "série", "serie", "assistir tv"]):
         return "TESTE_CINEPRO_IPTV"
     # 2. Ofertas e Afiliado Mercado Livre (checar antes de 'mercado' genérico)
     elif any(p in t for p in ["achadinho", "achados", "promoção", "promocao", "oferta", "desconto", "recomenda", "comprar", "afiliado", "mercado livre", "loja online"]):
@@ -53,7 +59,20 @@ def gerar_resposta_comercial(nome_cliente, mensagem):
     intencao = classificar_intencao(mensagem)
     saudacao = f"Olá, {nome_cliente}! Tudo bem? Aqui é o atendimento automático da Jonas Tech Solutions."
 
-    if intencao == "TESTE_CINEPRO_IPTV":
+    if intencao == "SOLICITACAO_PIX":
+        resposta = (
+            f"{saudacao}\n\n"
+            f"🔑 *CHAVE PIX OFICIAL DO JONAS (Copia e Cola):*\n\n"
+            f"`{CHAVE_PIX_OFICIAL}`\n\n"
+            f"💰 *Tabela de Valores Oficiais:*\n"
+            f"• 📺 *CinePro TV (30 dias de acesso 780 canais):* R$ 30,00\n"
+            f"• 🏪 *Sistema Comercial PDV & Estoque:* R$ 150,00\n"
+            f"• ⚡ *Suíte Windows Boost PRO:* R$ 150,00 (ou LITE R$ 30,00)\n"
+            f"• 🤖 *Implantação Robô WhatsApp 24/7:* R$ 250,00\n"
+            f"• 🔥 *Super Combo Comércio 3 em 1:* R$ 350,00\n\n"
+            f"✅ *Instruções:* Após realizar o PIX no seu banco, envie o comprovante nesta mesma conversa para liberarmos o seu acesso na hora!"
+        )
+    elif intencao == "TESTE_CINEPRO_IPTV":
         resposta = (
             f"{saudacao}\n\n"
             f"📺 *SEU TESTE GRÁTIS DE 2 HORAS DO CINEPRO TV ESTÁ LIBERADO!*\n\n"
@@ -164,9 +183,10 @@ def webhook_whatsapp():
                 )
                 update_data["msg_fechamento_compra"] = (
                     f"Olá, {nome}! Seu teste grátis de 2 horas está chegando ao fim! ⏳\n"
-                    f"O que achou da variedade dos 780+ canais?\n"
-                    f"Para continuar assistindo o mês inteiro sem nenhuma interrupção, nosso plano mensal é de apenas *R$ 30,00 no PIX*.\n"
-                    f"Posso te mandar a chave PIX agora para liberar seu acesso mensal?"
+                    f"O que achou da variedade dos 780+ canais?\n\n"
+                    f"Para continuar assistindo o mês inteiro sem nenhuma interrupção, nosso plano mensal é de apenas *R$ 30,00 no PIX*.\n\n"
+                    f"🔑 *Chave PIX Oficial (Copia e Cola):*\n`{CHAVE_PIX_OFICIAL}`\n\n"
+                    f"Assim que fizer o PIX, envie o comprovante aqui para liberarmos seu acesso mensal completo!"
                 )
 
             leads_col.update_one(
