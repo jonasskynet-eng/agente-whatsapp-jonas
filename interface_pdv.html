@@ -545,17 +545,21 @@
     </div>
     <div class="header-badges">
       <div class="badge-status" style="background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid #38bdf8;">☁️ Nuvem Online 24/7</div>
+      <a href="/tv" target="_blank" style="padding: 6px 14px; background: rgba(168, 85, 247, 0.2); border: 1px solid #a855f7; color: #d8b4fe; border-radius: 8px; text-decoration: none; font-size: 0.85rem; font-weight: 600; display: flex; align-items: center; gap: 6px; transition: all 0.2s;">📺 CinePro TV Nuvem</a>
       <span style="font-size: 0.85rem; color: var(--text-muted);">Operador: <strong>Jonas Mendonça</strong></span>
     </div>
   </header>
 
   <!-- ABAS -->
-  <nav class="tabs-bar">
-    <button class="tab-btn active" onclick="trocarAba('pdv')">🛒 1. Frente de Caixa (PDV)</button>
+    <nav class="tabs-bar">
+    <button class="tab-btn active" onclick="trocarAba('pdv')">🛒 1. PDV Caixa</button>
     <button class="tab-btn" onclick="trocarAba('estoque')">📦 2. Produtos & Estoque</button>
-    <button class="tab-btn" onclick="trocarAba('pix')">💳 3. Gerador PIX Oficial</button>
-    <button class="tab-btn" onclick="trocarAba('fechamento')">📊 4. Fechamento de Caixa</button>
-    <button class="tab-btn" onclick="trocarAba('estresse')">🚀 5. Teste de Estresse & Benchmark</button>
+    <button class="tab-btn" onclick="trocarAba('equilibrio')">📊 3. Ponto de Equilíbrio & Lucro</button>
+    <button class="tab-btn" onclick="trocarAba('clientes')">👥 4. Clientes & Fiado CRM</button>
+    <button class="tab-btn" onclick="trocarAba('frotas')">🚗 5. Frotas, Locadora & Seguros</button>
+    <button class="tab-btn" onclick="trocarAba('pix')">💳 6. Gerador PIX Oficial</button>
+    <button class="tab-btn" onclick="trocarAba('fechamento')">📑 7. Fechamento de Caixa</button>
+    <button class="tab-btn" onclick="trocarAba('estresse')">🚀 8. Teste de Estresse</button>
   </nav>
 
   <!-- CONTEUDO PRINCIPAL -->
@@ -738,6 +742,251 @@
       </div>
     </section>
 
+    
+    <!-- ABA 3: PONTO DE EQUILÍBRIO & ANÁLISE DE LUCRO -->
+    <section id="pane-equilibrio" class="tab-pane">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:12px;">
+        <div>
+          <h2 style="font-size:1.4rem; font-weight:700;">📊 Ponto de Equilíbrio & Análise Financeira Real</h2>
+          <p style="color:var(--text-muted); font-size:0.9rem;">Métricas de investimento em estoque, despesas fixas da operação e cálculo de rentabilidade.</p>
+        </div>
+        <button onclick="carregarMetricasFinanceiras()" class="btn-acao btn-sucesso" style="padding:10px 18px; font-weight:600; font-size:0.9rem;">
+          🔄 Atualizar Cálculos Agora
+        </button>
+      </div>
+
+      <!-- CARDS DE METRICAS FINANCEIRAS -->
+      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap:1rem; margin-bottom:1.5rem;">
+        <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:12px; padding:1.2rem;">
+          <span style="font-size:0.8rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;">💰 Capital em Estoque (Custo)</span>
+          <div id="finInvestidoEstoque" style="font-size:1.6rem; font-weight:800; color:#38bdf8; font-family:var(--font-mono); margin-top:6px;">R$ 0,00</div>
+          <span id="finTotalItensEstoque" style="font-size:0.75rem; color:var(--text-muted);">0 itens cadastrados</span>
+        </div>
+
+        <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:12px; padding:1.2rem;">
+          <span style="font-size:0.8rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;">🏷️ Potencial de Venda</span>
+          <div id="finVendaEstoque" style="font-size:1.6rem; font-weight:800; color:#a855f7; font-family:var(--font-mono); margin-top:6px;">R$ 0,00</div>
+          <span id="finLucroProjetado" style="font-size:0.75rem; color:#10b981;">Lucro projetado: R$ 0,00</span>
+        </div>
+
+        <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:12px; padding:1.2rem;">
+          <span style="font-size:0.8rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;">🏢 Despesas Fixas (Mês)</span>
+          <div id="finTotalCustosFixos" style="font-size:1.6rem; font-weight:800; color:#f59e0b; font-family:var(--font-mono); margin-top:6px;">R$ 0,00</div>
+          <span style="font-size:0.75rem; color:var(--text-muted);">Aluguel, Luz, Internet, Pessoal</span>
+        </div>
+
+        <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:12px; padding:1.2rem;">
+          <span style="font-size:0.8rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;">🎯 Ponto de Equilíbrio (Mês)</span>
+          <div id="finPontoEquilibrio" style="font-size:1.6rem; font-weight:800; color:#ef4444; font-family:var(--font-mono); margin-top:6px;">R$ 0,00</div>
+          <span id="finMetaDiaria" style="font-size:0.75rem; color:var(--text-muted);">Meta diária: R$ 0,00</span>
+        </div>
+
+        <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:12px; padding:1.2rem;">
+          <span style="font-size:0.8rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;">📈 Faturamento do Mês</span>
+          <div id="finFaturamentoMes" style="font-size:1.6rem; font-weight:800; color:#10b981; font-family:var(--font-mono); margin-top:6px;">R$ 0,00</div>
+          <span id="finQtdVendasMes" style="font-size:0.75rem; color:var(--text-muted);">0 vendas registradas</span>
+        </div>
+
+        <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:12px; padding:1.2rem;">
+          <span style="font-size:0.8rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;">💵 Lucro Líquido Real</span>
+          <div id="finLucroLiquido" style="font-size:1.6rem; font-weight:800; color:#10b981; font-family:var(--font-mono); margin-top:6px;">R$ 0,00</div>
+          <span id="finStatusLucro" style="font-size:0.75rem; font-weight:600;">Status Operacional</span>
+        </div>
+      </div>
+
+      <!-- BARRA DE PROGRESSO DO BREAK-EVEN -->
+      <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:12px; padding:1.5rem; margin-bottom:1.5rem;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <strong style="font-size:1rem;">Meta para Cobertura de Despesas Operacionais (Break-Even)</strong>
+          <span id="finProgressoTexto" style="font-weight:700; color:#38bdf8; font-family:var(--font-mono);">0%</span>
+        </div>
+        <div style="background:rgba(255,255,255,0.08); border-radius:10px; height:18px; overflow:hidden; position:relative;">
+          <div id="finBarraProgresso" style="background:linear-gradient(90deg, #3b82f6, #10b981); height:100%; width:0%; transition:width 0.6s ease-in-out;"></div>
+        </div>
+        <p style="font-size:0.8rem; color:var(--text-muted); margin-top:8px;">
+          💡 <em>O Ponto de Equilíbrio é o valor exato que o negócio precisa vender para pagar todos os custos operacionais (aluguel, água, luz, internet, equipe). A partir deste valor, cada venda gera lucro líquido direto para a empresa.</em>
+        </p>
+      </div>
+
+      <!-- TABELA DE DESPESAS FIXAS & CADASTRO -->
+      <div style="display:grid; grid-template-columns: 2fr 1fr; gap:1.5rem;">
+        <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:12px; padding:1.2rem;">
+          <h3 style="font-size:1.1rem; margin-bottom:1rem; font-weight:700;">🏢 Custos Fixos Operacionais Cadastrados</h3>
+          <div style="overflow-x:auto;">
+            <table style="width:100%; border-collapse:collapse; text-align:left; font-size:0.9rem;">
+              <thead>
+                <tr style="border-bottom:1px solid var(--card-border); color:var(--text-muted);">
+                  <th style="padding:8px;">Categoria</th>
+                  <th style="padding:8px;">Descrição</th>
+                  <th style="padding:8px;">Dia Venc.</th>
+                  <th style="padding:8px;">Valor Mensal</th>
+                  <th style="padding:8px; text-align:center;">Ação</th>
+                </tr>
+              </thead>
+              <tbody id="tabelaCustosFixos">
+                <tr><td colspan="5" style="text-align:center; padding:16px; color:var(--text-muted);">Carregando custos...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- FORMULARIO NOVO CUSTO FIXO -->
+        <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:12px; padding:1.2rem;">
+          <h3 style="font-size:1.1rem; margin-bottom:1rem; font-weight:700;">➕ Adicionar Despesa Fixa</h3>
+          <div style="display:flex; flex-direction:column; gap:10px;">
+            <div>
+              <label style="font-size:0.8rem; color:var(--text-muted);">Categoria</label>
+              <select id="custoCategoria" class="input-form" style="width:100%; margin-top:4px;">
+                <option value="Espaço Físico">Espaço Físico (Aluguel, IPTU)</option>
+                <option value="Utilidades">Utilidades (Energia, Água)</option>
+                <option value="Comunicação">Comunicação (Internet, Telefonia)</option>
+                <option value="Pessoal">Pessoal (Salários, Pró-Labore)</option>
+                <option value="Sistemas">Sistemas & Nuvem</option>
+                <option value="Outros">Outras Despesas</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:0.8rem; color:var(--text-muted);">Descrição da Despesa</label>
+              <input type="text" id="custoDescricao" placeholder="Ex: Aluguel Loja Centro" class="input-form" style="width:100%; margin-top:4px;">
+            </div>
+            <div>
+              <label style="font-size:0.8rem; color:var(--text-muted);">Valor Mensal (R$)</label>
+              <input type="number" step="0.01" id="custoValor" placeholder="1500.00" class="input-form" style="width:100%; margin-top:4px;">
+            </div>
+            <div>
+              <label style="font-size:0.8rem; color:var(--text-muted);">Dia de Vencimento</label>
+              <input type="number" min="1" max="31" id="custoDia" value="10" class="input-form" style="width:100%; margin-top:4px;">
+            </div>
+            <button onclick="salvarCustoFixo()" class="btn-acao btn-primario" style="margin-top:8px; padding:10px; font-weight:600;">
+              💾 Gravar Despesa no Atlas
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ABA 4: CLIENTES & FIADO CRM -->
+    <section id="pane-clientes" class="tab-pane">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:12px;">
+        <div>
+          <h2 style="font-size:1.4rem; font-weight:700;">👥 Gestão de Clientes, CRM & Fiado Seguro</h2>
+          <p style="color:var(--text-muted); font-size:0.9rem;">Cadastro completo, controle de limite de crédito a prazo e cobrança via WhatsApp em 1 clique.</p>
+        </div>
+        <div style="display:flex; gap:10px;">
+          <input type="text" id="buscaClienteInput" onkeyup="filtrarClientes()" placeholder="🔍 Buscar por nome, CPF ou WhatsApp..." class="input-form" style="width:300px;">
+          <button onclick="abrirModalCliente()" class="btn-acao btn-primario" style="padding:10px 18px; font-weight:600; font-size:0.9rem;">
+            ➕ Novo Cliente
+          </button>
+        </div>
+      </div>
+
+      <!-- TABELA DE CLIENTES -->
+      <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:12px; padding:1.2rem; overflow-x:auto;">
+        <table style="width:100%; border-collapse:collapse; text-align:left; font-size:0.9rem;">
+          <thead>
+            <tr style="border-bottom:1px solid var(--card-border); color:var(--text-muted);">
+              <th style="padding:10px;">Nome / Razão Social</th>
+              <th style="padding:10px;">CPF / CNPJ</th>
+              <th style="padding:10px;">WhatsApp</th>
+              <th style="padding:10px;">Limite Fiado</th>
+              <th style="padding:10px;">Saldo Devedor</th>
+              <th style="padding:10px;">Status</th>
+              <th style="padding:10px; text-align:center;">Ações Rápidas</th>
+            </tr>
+          </thead>
+          <tbody id="tabelaClientes">
+            <tr><td colspan="7" style="text-align:center; padding:20px; color:var(--text-muted);">Carregando carteira de clientes...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ABA 5: FROTAS, LOCADORA & SEGUROS VEICULARES -->
+    <section id="pane-frotas" class="tab-pane">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:12px;">
+        <div>
+          <h2 style="font-size:1.4rem; font-weight:700;">🚗 Frotas de Veículos, Locadora & Monitoramento Satelital</h2>
+          <p style="color:var(--text-muted); font-size:0.9rem;">Telemetria veicular, corte de ignição via satélite e controle de apólices de locação e seguro.</p>
+        </div>
+        <div style="display:flex; gap:10px;">
+          <button onclick="carregarFrotasESeguros()" class="btn-acao btn-sucesso" style="padding:10px 18px; font-weight:600; font-size:0.9rem;">
+            🔄 Sincronizar Satélite
+          </button>
+          <button onclick="abrirModalVeiculo()" class="btn-acao btn-primario" style="padding:10px 18px; font-weight:600; font-size:0.9rem;">
+            ➕ Cadastrar Veículo
+          </button>
+        </div>
+      </div>
+
+      <!-- KPI CARDS FROTAS -->
+      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:1rem; margin-bottom:1.5rem;">
+        <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:12px; padding:1.2rem;">
+          <span style="font-size:0.8rem; color:var(--text-muted); text-transform:uppercase;">🚗 Veículos na Frota</span>
+          <div id="frotaTotalQtd" style="font-size:1.8rem; font-weight:800; color:#38bdf8; font-family:var(--font-mono); margin-top:4px;">0</div>
+          <span style="font-size:0.75rem; color:var(--text-muted);">Com rastreador ativo</span>
+        </div>
+        <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:12px; padding:1.2rem;">
+          <span style="font-size:0.8rem; color:var(--text-muted); text-transform:uppercase;">🛣️ Em Locação / Trânsito</span>
+          <div id="frotaAlugadosQtd" style="font-size:1.8rem; font-weight:800; color:#f59e0b; font-family:var(--font-mono); margin-top:4px;">0</div>
+          <span style="font-size:0.75rem; color:#f59e0b;">Gerando diárias</span>
+        </div>
+        <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:12px; padding:1.2rem;">
+          <span style="font-size:0.8rem; color:var(--text-muted); text-transform:uppercase;">🅿️ No Pátio (Disponíveis)</span>
+          <div id="frotaDisponiveisQtd" style="font-size:1.8rem; font-weight:800; color:#10b981; font-family:var(--font-mono); margin-top:4px;">0</div>
+          <span style="font-size:0.75rem; color:#10b981;">Prontos para saída</span>
+        </div>
+        <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:12px; padding:1.2rem;">
+          <span style="font-size:0.8rem; color:var(--text-muted); text-transform:uppercase;">🛡️ Apólices / Seguros</span>
+          <div id="frotaApolicesQtd" style="font-size:1.8rem; font-weight:800; color:#a855f7; font-family:var(--font-mono); margin-top:4px;">0</div>
+          <span style="font-size:0.75rem; color:#a855f7;">Contratos vigentes</span>
+        </div>
+      </div>
+
+      <!-- TABELA DE VEICULOS COM TELEMETRIA & BLOQUEIO SATELITAL -->
+      <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:12px; padding:1.2rem; margin-bottom:1.5rem; overflow-x:auto;">
+        <h3 style="font-size:1.1rem; margin-bottom:1rem; font-weight:700;">📡 Telemetria & Controle Remoto da Frota</h3>
+        <table style="width:100%; border-collapse:collapse; text-align:left; font-size:0.9rem;">
+          <thead>
+            <tr style="border-bottom:1px solid var(--card-border); color:var(--text-muted);">
+              <th style="padding:10px;">Placa</th>
+              <th style="padding:10px;">Modelo / Categoria</th>
+              <th style="padding:10px;">Odômetro</th>
+              <th style="padding:10px;">Diária</th>
+              <th style="padding:10px;">Status</th>
+              <th style="padding:10px;">Ignição</th>
+              <th style="padding:10px;">Localização GPS</th>
+              <th style="padding:10px; text-align:center;">Comando Satélite</th>
+            </tr>
+          </thead>
+          <tbody id="tabelaVeiculos">
+            <tr><td colspan="8" style="text-align:center; padding:20px; color:var(--text-muted);">Carregando telemetria de satélite...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- TABELA DE APÓLICES E SEGUROS -->
+      <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:12px; padding:1.2rem; overflow-x:auto;">
+        <h3 style="font-size:1.1rem; margin-bottom:1rem; font-weight:700;">📑 Apólices de Seguros & Contratos de Locação</h3>
+        <table style="width:100%; border-collapse:collapse; text-align:left; font-size:0.9rem;">
+          <thead>
+            <tr style="border-bottom:1px solid var(--card-border); color:var(--text-muted);">
+              <th style="padding:10px;">Nº Apólice / Contrato</th>
+              <th style="padding:10px;">Veículo Placa</th>
+              <th style="padding:10px;">Cliente Vinculado</th>
+              <th style="padding:10px;">Tipo de Cobertura</th>
+              <th style="padding:10px;">Franquia</th>
+              <th style="padding:10px;">Valor Mensal</th>
+              <th style="padding:10px;">Vigência Até</th>
+              <th style="padding:10px;">Status</th>
+            </tr>
+          </thead>
+          <tbody id="tabelaApolices">
+            <tr><td colspan="8" style="text-align:center; padding:20px; color:var(--text-muted);">Carregando apólices de seguro...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
     <!-- ABA 4: FECHAMENTO DE CAIXA -->
     <section id="pane-fechamento" class="tab-pane">
       <div class="card" style="max-width: 700px; margin: 0 auto;">
@@ -877,6 +1126,9 @@
 
       if (abaId === 'estoque') carregarEstoque();
       if (abaId === 'fechamento') carregarStatusCaixa();
+      if (abaId === 'equilibrio') carregarMetricasFinanceiras();
+      if (abaId === 'clientes') carregarClientes();
+      if (abaId === 'frotas') carregarFrotasESeguros();
       if (abaId === 'pdv') {
         setTimeout(() => document.getElementById('inputCodigo').focus(), 100);
       }
@@ -1306,6 +1558,324 @@
         btn.innerText = '▶ Executar Novo Teste de Estresse ao Vivo';
       }
     }
+
+    
+    // =========================================================================
+    // MODULOS AVANÇADOS: PONTO DE EQUILÍBRIO, CRM CLIENTES E FROTAS SATELITAIS
+    // =========================================================================
+
+    let listaClientesCache = [];
+
+    async function carregarMetricasFinanceiras() {
+      try {
+        const res = await fetch('/api/financeiro/metricas');
+        const d = await res.json();
+        
+        document.getElementById('finInvestidoEstoque').innerText = `R$ ${d.valor_investido_estoque.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
+        document.getElementById('finTotalItensEstoque').innerText = `${d.total_itens_estoque} itens em estoque no Atlas`;
+        
+        document.getElementById('finVendaEstoque').innerText = `R$ ${d.valor_venda_estoque.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
+        document.getElementById('finLucroProjetado').innerText = `Lucro projetado: R$ ${d.lucro_projetado_estoque.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
+        
+        document.getElementById('finTotalCustosFixos').innerText = `R$ ${d.total_custos_fixos.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
+        document.getElementById('finPontoEquilibrio').innerText = `R$ ${d.ponto_equilibrio_mensal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
+        document.getElementById('finMetaDiaria').innerText = `Meta diária: R$ ${d.meta_diaria_break_even.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
+        
+        document.getElementById('finFaturamentoMes').innerText = `R$ ${d.faturamento_mes.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
+        document.getElementById('finQtdVendasMes').innerText = `${d.qtd_vendas_mes} vendas no mês atual (${d.mes_referencia})`;
+        
+        const elLucro = document.getElementById('finLucroLiquido');
+        const elStatus = document.getElementById('finStatusLucro');
+        elLucro.innerText = `R$ ${d.lucro_liquido_real.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
+        if (d.lucro_liquido_real >= 0) {
+          elLucro.style.color = '#10b981';
+          elStatus.innerText = '🟢 Operação Lucrativa (No Azul)';
+          elStatus.style.color = '#10b981';
+        } else {
+          elLucro.style.color = '#ef4444';
+          elStatus.innerText = `🟠 Faltam R$ ${Math.abs(d.lucro_liquido_real).toLocaleString('pt-BR', {minimumFractionDigits: 2})} para Break-Even`;
+          elStatus.style.color = '#f59e0b';
+        }
+
+        const progresso = Math.min(100, Math.max(0, d.progresso_break_even_pct));
+        document.getElementById('finProgressoTexto').innerText = `${d.progresso_break_even_pct}% atingido`;
+        document.getElementById('finBarraProgresso').style.width = `${progresso}%`;
+        
+        carregarTabelaCustosFixos();
+      } catch (e) {
+        console.error('Erro ao carregar métricas financeiras:', e);
+      }
+    }
+
+    async function carregarTabelaCustosFixos() {
+      try {
+        const res = await fetch('/api/financeiro/custos-fixos');
+        const custos = await res.json();
+        const tbody = document.getElementById('tabelaCustosFixos');
+        if (!custos.length) {
+          tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:16px;">Nenhum custo fixo cadastrado.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = custos.map(c => `
+          <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+            <td style="padding:8px;"><span style="background:rgba(59,130,246,0.15); color:#60a5fa; padding:3px 8px; border-radius:4px; font-size:0.8rem;">${c.categoria || 'Geral'}</span></td>
+            <td style="padding:8px; font-weight:600;">${c.descricao}</td>
+            <td style="padding:8px; color:var(--text-muted);">Dia ${c.vencimento_dia || 10}</td>
+            <td style="padding:8px; font-weight:700; color:#f59e0b; font-family:var(--font-mono);">R$ ${Number(c.valor_mensal || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+            <td style="padding:8px; text-align:center;">
+              <button onclick="excluirCustoFixo('${c.descricao}')" style="background:none; border:none; cursor:pointer; color:#ef4444;" title="Excluir Custo">🗑️</button>
+            </td>
+          </tr>
+        `).join('');
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function salvarCustoFixo() {
+      const desc = document.getElementById('custoDescricao').value.trim();
+      const val = parseFloat(document.getElementById('custoValor').value);
+      const cat = document.getElementById('custoCategoria').value;
+      const dia = parseInt(document.getElementById('custoDia').value) || 10;
+      if (!desc || isNaN(val) || val <= 0) {
+        alert('Informe a descrição e o valor mensal da despesa.');
+        return;
+      }
+      try {
+        await fetch('/api/financeiro/custos-fixos', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({categoria: cat, descricao: desc, valor_mensal: val, vencimento_dia: dia})
+        });
+        document.getElementById('custoDescricao').value = '';
+        document.getElementById('custoValor').value = '';
+        carregarMetricasFinanceiras();
+      } catch (e) {
+        alert('Erro ao gravar custo fixo.');
+      }
+    }
+
+    async function excluirCustoFixo(descricao) {
+      if (!confirm(`Remover despesa "${descricao}"?`)) return;
+      try {
+        await fetch(`/api/financeiro/custos-fixos/${encodeURIComponent(descricao)}`, {method: 'DELETE'});
+        carregarMetricasFinanceiras();
+      } catch (e) {
+        alert('Erro ao excluir custo.');
+      }
+    }
+
+    // --- MÓDULO CLIENTES & CRM ---
+    async function carregarClientes() {
+      try {
+        const res = await fetch('/api/clientes');
+        listaClientesCache = await res.json();
+        renderizarTabelaClientes(listaClientesCache);
+      } catch (e) {
+        console.error('Erro ao carregar clientes:', e);
+      }
+    }
+
+    function renderizarTabelaClientes(lista) {
+      const tbody = document.getElementById('tabelaClientes');
+      if (!lista.length) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px; color:var(--text-muted);">Nenhum cliente localizado.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = lista.map(c => {
+        const numWhats = (c.whatsapp || '').replace(/\D/g, '');
+        const saldoDev = Number(c.saldo_devedor || 0);
+        const linkWhats = numWhats ? `https://wa.me/55${numWhats}?text=${encodeURIComponent(`Olá ${c.nome}, tudo bem? Aqui é o Jonas da Jonas Tech Solutions! Segue extrato da sua conta: Saldo em aberto: R$ ${saldoDev.toFixed(2)}.`)}` : '#';
+        
+        return `
+          <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+            <td style="padding:10px; font-weight:700;">${c.nome}</td>
+            <td style="padding:10px; font-family:var(--font-mono); color:var(--text-muted);">${c.cpf_cnpj}</td>
+            <td style="padding:10px;">
+              ${numWhats ? `<a href="${linkWhats}" target="_blank" style="color:#22c55e; text-decoration:none; font-weight:600;">📱 ${c.whatsapp}</a>` : '<span style="color:var(--text-muted);">-</span>'}
+            </td>
+            <td style="padding:10px; font-family:var(--font-mono);">R$ ${Number(c.limite_credito || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+            <td style="padding:10px; font-family:var(--font-mono); font-weight:700; color:${saldoDev > 0 ? '#ef4444' : '#10b981'};">
+              R$ ${saldoDev.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+            </td>
+            <td style="padding:10px;">
+              <span style="background:${c.status === 'ATIVO' ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)'}; color:${c.status === 'ATIVO' ? '#4ade80' : '#f87171'}; padding:3px 8px; border-radius:4px; font-size:0.75rem; font-weight:700;">${c.status || 'ATIVO'}</span>
+            </td>
+            <td style="padding:10px; text-align:center;">
+              <div style="display:flex; justify-content:center; gap:6px;">
+                ${numWhats ? `<a href="${linkWhats}" target="_blank" class="btn-acao" style="background:#22c55e; color:#fff; padding:4px 8px; font-size:0.75rem; text-decoration:none; border-radius:4px;" title="Conversar no WhatsApp">💬 Cobrar/Avisar</a>` : ''}
+                <button onclick="lancarMovimentoFiado('${c.cpf_cnpj}', 'debito')" class="btn-acao btn-secundario" style="padding:4px 8px; font-size:0.75rem;" title="Lançar compra fiado">+ Fiado</button>
+                <button onclick="lancarMovimentoFiado('${c.cpf_cnpj}', 'pagamento')" class="btn-acao btn-sucesso" style="padding:4px 8px; font-size:0.75rem;" title="Receber pagamento">💵 Baixar</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function filtrarClientes() {
+      const termo = document.getElementById('buscaClienteInput').value.toLowerCase().trim();
+      if (!termo) {
+        renderizarTabelaClientes(listaClientesCache);
+        return;
+      }
+      const filtrados = listaClientesCache.filter(c => 
+        (c.nome || '').toLowerCase().includes(termo) ||
+        (c.cpf_cnpj || '').toLowerCase().includes(termo) ||
+        (c.whatsapp || '').includes(termo)
+      );
+      renderizarTabelaClientes(filtrados);
+    }
+
+    async function abrirModalCliente() {
+      const nome = prompt('Nome completo ou Razão Social:');
+      if (!nome) return;
+      const cpfCnpj = prompt('CPF ou CNPJ:');
+      if (!cpfCnpj) return;
+      const whats = prompt('WhatsApp (DDD + Número):') || '';
+      const limite = parseFloat(prompt('Limite de Crédito / Fiado (R$):', '1000')) || 1000;
+      
+      try {
+        await fetch('/api/clientes', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({nome: nome, cpf_cnpj: cpfCnpj, whatsapp: whats, limite_credito: limite, saldo_devedor: 0.0, status: 'ATIVO'})
+        });
+        carregarClientes();
+        alert('Cliente cadastrado com sucesso no MongoDB Atlas!');
+      } catch (e) {
+        alert('Erro ao cadastrar cliente.');
+      }
+    }
+
+    async function lancarMovimentoFiado(cpfCnpj, tipo) {
+      const msg = tipo === 'debito' ? 'Valor da nova compra no FIADO (R$):' : 'Valor recebido para abater da dívida (R$):';
+      const valStr = prompt(msg);
+      if (!valStr) return;
+      const val = parseFloat(valStr);
+      if (isNaN(val) || val <= 0) return alert('Valor inválido.');
+
+      try {
+        const res = await fetch('/api/clientes/movimentar-saldo', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({cpf_cnpj: cpfCnpj, tipo: tipo, valor: val})
+        });
+        const d = await res.json();
+        if (d.sucesso) {
+          carregarClientes();
+          alert(`Saldo do cliente atualizado com sucesso! Novo saldo devedor: R$ ${d.cliente.saldo_devedor.toFixed(2)}`);
+        }
+      } catch (e) {
+        alert('Erro ao movimentar saldo do cliente.');
+      }
+    }
+
+    // --- MÓDULO FROTAS, LOCADORA & SEGUROS ---
+    async function carregarFrotasESeguros() {
+      try {
+        const [resV, resA] = await Promise.all([
+          fetch('/api/frotas/veiculos'),
+          fetch('/api/seguros/apolices')
+        ]);
+        const veiculos = await resV.json();
+        const apolices = await resA.json();
+
+        // Atualiza KPIs
+        document.getElementById('frotaTotalQtd').innerText = veiculos.length;
+        document.getElementById('frotaAlugadosQtd').innerText = veiculos.filter(v => v.status === 'ALUGADO').length;
+        document.getElementById('frotaDisponiveisQtd').innerText = veiculos.filter(v => v.status === 'DISPONIVEL').length;
+        document.getElementById('frotaApolicesQtd').innerText = apolices.length;
+
+        // Renderiza tabela veiculos
+        const tbodyV = document.getElementById('tabelaVeiculos');
+        tbodyV.innerHTML = veiculos.map(v => `
+          <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+            <td style="padding:10px; font-family:var(--font-mono); font-weight:800; font-size:1rem; color:#38bdf8;">${v.placa}</td>
+            <td style="padding:10px; font-weight:600;">${v.modelo} <br><small style="color:var(--text-muted);">${v.categoria || 'Passeio'} (${v.ano || 2024})</small></td>
+            <td style="padding:10px; font-family:var(--font-mono);">${Number(v.km || 0).toLocaleString('pt-BR')} km</td>
+            <td style="padding:10px; font-family:var(--font-mono); color:#10b981; font-weight:700;">R$ ${Number(v.diaria_valor || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}/dia</td>
+            <td style="padding:10px;">
+              <span style="background:${v.status === 'DISPONIVEL' ? 'rgba(34,197,94,0.15)' : 'rgba(245,158,11,0.15)'}; color:${v.status === 'DISPONIVEL' ? '#4ade80' : '#fbbf24'}; padding:3px 8px; border-radius:4px; font-size:0.75rem; font-weight:700;">
+                ${v.status}
+              </span>
+            </td>
+            <td style="padding:10px;">
+              ${v.ignicao ? '<span style="color:#22c55e; font-weight:700;">🟢 Ligada</span>' : '<span style="color:var(--text-muted);">🔴 Desligada</span>'}
+            </td>
+            <td style="padding:10px; font-size:0.8rem; color:var(--text-muted);">
+              📍 ${v.gps?.endereco || 'São Paulo - SP'}<br>
+              <small style="color:#60a5fa; font-family:var(--font-mono);">ID: ${v.rastreador_id || 'SAT-0000'}</small>
+            </td>
+            <td style="padding:10px; text-align:center;">
+              <button onclick="acionarBloqueioSatelite('${v.placa}')" class="btn-acao" style="background:${v.bloqueado ? '#22c55e' : '#ef4444'}; color:#fff; padding:6px 12px; font-size:0.8rem; font-weight:700; border-radius:6px; cursor:pointer;">
+                ${v.bloqueado ? '🔓 Desbloquear Veículo' : '🚨 Cortar Ignição (Bloquear)'}
+              </button>
+            </td>
+          </tr>
+        `).join('');
+
+        // Renderiza tabela apolices
+        const tbodyA = document.getElementById('tabelaApolices');
+        tbodyA.innerHTML = apolices.map(a => `
+          <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+            <td style="padding:10px; font-family:var(--font-mono); font-weight:700; color:#a855f7;">${a.numero_apolice}</td>
+            <td style="padding:10px; font-weight:700; color:#38bdf8;">${a.veiculo_placa}</td>
+            <td style="padding:10px; font-weight:600;">${a.cliente_nome}</td>
+            <td style="padding:10px;"><span style="background:rgba(168,85,247,0.15); color:#c084fc; padding:3px 8px; border-radius:4px; font-size:0.75rem;">${a.tipo}</span></td>
+            <td style="padding:10px; font-family:var(--font-mono);">R$ ${Number(a.franquia || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+            <td style="padding:10px; font-family:var(--font-mono); font-weight:700; color:#10b981;">R$ ${Number(a.valor_mensal || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}/mês</td>
+            <td style="padding:10px; color:var(--text-muted);">${a.vigencia_fim || '31/12/2026'}</td>
+            <td style="padding:10px;"><span style="background:rgba(34,197,94,0.15); color:#4ade80; padding:3px 8px; border-radius:4px; font-size:0.75rem; font-weight:700;">${a.status}</span></td>
+          </tr>
+        `).join('');
+
+      } catch (e) {
+        console.error('Erro ao carregar frotas e seguros:', e);
+      }
+    }
+
+    async function acionarBloqueioSatelite(placa) {
+      if (!confirm(`Confirma o envio do sinal de satélite para alterar o status do veículo ${placa}?`)) return;
+      try {
+        const res = await fetch('/api/frotas/bloqueio', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({placa: placa})
+        });
+        const d = await res.json();
+        if (d.sucesso) {
+          alert(`📡 TELEMETRIA CONFIRMADA VIA SATÉLITE:
+${d.mensagem}`);
+          carregarFrotasESeguros();
+        } else {
+          alert('Erro no comando de satélite: ' + (d.erro || 'Falha na transmissão'));
+        }
+      } catch (e) {
+        alert('Erro ao transmitir comando de bloqueio.');
+      }
+    }
+
+    async function abrirModalVeiculo() {
+      const placa = prompt('Placa do veículo (padrão Mercosul):');
+      if (!placa) return;
+      const modelo = prompt('Modelo do veículo (ex: Fiat Strada 1.3):') || 'Veículo';
+      const diaria = parseFloat(prompt('Valor da diária (R$):', '150')) || 150;
+      const km = parseFloat(prompt('Km atual:', '20000')) || 20000;
+      
+      try {
+        await fetch('/api/frotas/veiculos', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({placa: placa, modelo: modelo, diaria_valor: diaria, km: km, status: 'DISPONIVEL', ignicao: false, bloqueado: false})
+        });
+        carregarFrotasESeguros();
+        alert(`Veículo ${placa} cadastrado com sucesso na frota!`);
+      } catch (e) {
+        alert('Erro ao cadastrar veículo.');
+      }
+    }
+
 
     // ATALHOS DE TECLADO (F2, F4, Enter)
     window.addEventListener('keydown', (e) => {

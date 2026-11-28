@@ -47,7 +47,7 @@ CIDADE_RECEBEDOR = "SAO PAULO"
 WHATSAPP_HUMANO = "(11) 96670-7293"
 
 # LINKS OFICIAIS
-LINK_PLAYER_IPTV = "https://jonasskynet-eng.github.io/cine-pro-tv-2026/"
+LINK_PLAYER_IPTV = "https://agente-whatsapp-jonas.onrender.com/tv"
 LINK_DEMO_PDV = "https://agente-whatsapp-jonas.onrender.com/pdv"
 
 # BANCO DE DADOS NA NUVEM (MONGODB ATLAS)
@@ -71,6 +71,10 @@ try:
     col_produtos = db["estoque_produtos"]
     col_fechamentos = db["fechamentos_caixa"]
     col_movimentacoes = db["movimentacoes_caixa"]
+    col_clientes = db["clientes_crm"]
+    col_custos = db["custos_fixos_loja"]
+    col_veiculos = db["veiculos_frotas"]
+    col_apolices = db["apolices_seguros"]
     print("[NUVEM] Conexão com MongoDB Atlas validada com sucesso!")
 except Exception as e:
     print(f"[ERRO MONGODB NUVEM] {e}")
@@ -85,6 +89,10 @@ except Exception as e:
     col_produtos = None
     col_fechamentos = None
     col_movimentacoes = None
+    col_clientes = None
+    col_custos = None
+    col_veiculos = None
+    col_apolices = None
 
 
 def agora_brasilia():
@@ -1236,6 +1244,329 @@ def api_pdv_pix_gerar():
         }), 200
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
+
+
+
+
+# ==============================================================================
+# MÓDULOS EXPANDIDOS ERP NUVEM: CINEPRO TV, BREAK-EVEN, CRM E FROTAS/SEGUROS
+# ==============================================================================
+
+@app.route("/tv", methods=["GET"])
+@app.route("/cinepro", methods=["GET"])
+@app.route("/player", methods=["GET"])
+def rota_cinepro_player_nuvem():
+    """Serve o Player Oficial do CinePro TV direto da Nuvem no Render sem 404."""
+    caminho = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cinepro_player.html")
+    if os.path.exists(caminho):
+        with open(caminho, "r", encoding="utf-8") as f:
+            return f.read(), 200, {"Content-Type": "text/html; charset=utf-8"}
+    return "Player CinePro em atualização", 404
+
+
+@app.route("/canais.json", methods=["GET"])
+def rota_canais_json_nuvem():
+    """Entrega o catálogo com os milhares de canais CinePro TV direto da Nuvem."""
+    caminho = os.path.join(os.path.dirname(os.path.abspath(__file__)), "canais.json")
+    if os.path.exists(caminho):
+        with open(caminho, "r", encoding="utf-8") as f:
+            return f.read(), 200, {"Content-Type": "application/json; charset=utf-8"}
+    return jsonify([]), 404
+
+
+@app.route("/api/financeiro/metricas", methods=["GET"])
+def api_financeiro_metricas():
+    """Calcula investimento em estoque, custos fixos, faturamento e Ponto de Equilíbrio."""
+    try:
+        prods = list(col_produtos.find({}, {"_id": 0})) if col_produtos is not None else []
+        valor_custo_estoque = sum(float(p.get("quantidade_estoque") or p.get("estoque_atual") or 0.0) * float(p.get("preco_custo") or (float(p.get("preco_venda", 0.0)) * 0.6)) for p in prods)
+        valor_venda_estoque = sum(float(p.get("quantidade_estoque") or p.get("estoque_atual") or 0.0) * float(p.get("preco_venda") or 0.0) for p in prods)
+        lucro_projetado_estoque = max(0.0, valor_venda_estoque - valor_custo_estoque)
+        total_itens_estoque = sum(float(p.get("quantidade_estoque") or p.get("estoque_atual") or 0.0) for p in prods)
+
+        custos = list(col_custos.find({}, {"_id": 0})) if col_custos is not None else []
+        total_custos_fixos = sum(float(c.get("valor_mensal") or 0.0) for c in custos)
+
+        vendas = list(col_vendas.find({}, {"_id": 0})) if col_vendas is not None else []
+        mes_atual_str = agora_brasilia().strftime("/%m/%Y")
+        vendas_mes = [v for v in vendas if mes_atual_str in str(v.get("data_hora", ""))]
+        faturamento_mes = sum(float(v.get("total_liquido") or 0.0) for v in vendas_mes)
+        faturamento_total_acumulado = sum(float(v.get("total_liquido") or 0.0) for v in vendas)
+        qtd_vendas_mes = len(vendas_mes)
+        ticket_medio = round(faturamento_mes / qtd_vendas_mes, 2) if qtd_vendas_mes > 0 else 0.0
+
+        margem_contribuicao_pct = 40.0
+        ponto_equilibrio_mensal = round(total_custos_fixos / (margem_contribuicao_pct / 100.0), 2) if total_custos_fixos > 0 else 0.0
+        meta_diaria_break_even = round(ponto_equilibrio_mensal / 26.0, 2) if ponto_equilibrio_mensal > 0 else 0.0
+        
+        lucro_bruto_mes = faturamento_mes * (margem_contribuicao_pct / 100.0)
+        lucro_liquido_real = round(lucro_bruto_mes - total_custos_fixos, 2)
+        progresso_pct = min(100.0, round((faturamento_mes / ponto_equilibrio_mensal * 100.0), 1)) if ponto_equilibrio_mensal > 0 else 100.0
+
+        return jsonify({
+            "valor_investido_estoque": round(valor_custo_estoque, 2),
+            "valor_venda_estoque": round(valor_venda_estoque, 2),
+            "lucro_projetado_estoque": round(lucro_projetado_estoque, 2),
+            "total_itens_estoque": int(total_itens_estoque),
+            "total_custos_fixos": round(total_custos_fixos, 2),
+            "faturamento_mes": round(faturamento_mes, 2),
+            "faturamento_total_acumulado": round(faturamento_total_acumulado, 2),
+            "qtd_vendas_mes": qtd_vendas_mes,
+            "ticket_medio": ticket_medio,
+            "margem_contribuicao_pct": margem_contribuicao_pct,
+            "ponto_equilibrio_mensal": ponto_equilibrio_mensal,
+            "meta_diaria_break_even": meta_diaria_break_even,
+            "lucro_liquido_real": lucro_liquido_real,
+            "progresso_break_even_pct": progresso_pct,
+            "mes_referencia": agora_brasilia().strftime("%m/%Y")
+        }), 200
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
+
+@app.route("/api/financeiro/custos-fixos", methods=["GET", "POST"])
+def api_financeiro_custos():
+    try:
+        if request.method == "POST":
+            dados = request.json or {}
+            categoria = dados.get("categoria", "Geral")
+            descricao = dados.get("descricao", "Despesa Fixa").strip()
+            valor = float(dados.get("valor_mensal", 0.0))
+            vencimento = int(dados.get("vencimento_dia", 10))
+            doc = {
+                "categoria": categoria,
+                "descricao": descricao,
+                "valor_mensal": valor,
+                "vencimento_dia": vencimento,
+                "atualizado_em": agora_brasilia().strftime("%d/%m/%Y %H:%M:%S")
+            }
+            if col_custos is not None and descricao:
+                col_custos.update_one({"descricao": descricao}, {"$set": doc}, upsert=True)
+            return jsonify({"sucesso": True, "custo": doc}), 201
+
+        custos = list(col_custos.find({}, {"_id": 0})) if col_custos is not None else []
+        return jsonify(custos), 200
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
+
+@app.route("/api/financeiro/custos-fixos/<descricao>", methods=["DELETE"])
+def api_financeiro_deletar_custo(descricao):
+    try:
+        if col_custos is not None:
+            col_custos.delete_one({"descricao": descricao})
+        return jsonify({"sucesso": True}), 200
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
+
+@app.route("/api/clientes", methods=["GET", "POST"])
+def api_crm_clientes():
+    """Gerencia cadastro de clientes, limites de crédito e fiado seguro."""
+    try:
+        if request.method == "POST":
+            dados = request.json or {}
+            cpf_cnpj = dados.get("cpf_cnpj", "").strip()
+            if not cpf_cnpj:
+                return jsonify({"erro": "CPF ou CNPJ é obrigatório"}), 400
+            doc = {
+                "nome": dados.get("nome", "Cliente Sem Nome").strip(),
+                "cpf_cnpj": cpf_cnpj,
+                "whatsapp": dados.get("whatsapp", "").strip(),
+                "endereco": dados.get("endereco", "").strip(),
+                "limite_credito": float(dados.get("limite_credito", 1000.0)),
+                "saldo_devedor": float(dados.get("saldo_devedor", 0.0)),
+                "status": dados.get("status", "ATIVO"),
+                "observacoes": dados.get("observacoes", "").strip(),
+                "cadastrado_em": agora_brasilia().strftime("%d/%m/%Y %H:%M:%S")
+            }
+            if col_clientes is not None:
+                col_clientes.update_one({"cpf_cnpj": cpf_cnpj}, {"$set": doc}, upsert=True)
+            return jsonify({"sucesso": True, "cliente": doc}), 201
+
+        busca = (request.args.get("busca") or "").strip()
+        filtro = {}
+        if busca:
+            filtro = {"$or": [
+                {"nome": {"$regex": busca, "$options": "i"}},
+                {"cpf_cnpj": {"$regex": busca, "$options": "i"}},
+                {"whatsapp": {"$regex": busca, "$options": "i"}}
+            ]}
+        clientes = list(col_clientes.find(filtro, {"_id": 0}).sort("nome", 1)) if col_clientes is not None else []
+        return jsonify(clientes), 200
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
+
+@app.route("/api/clientes/movimentar-saldo", methods=["POST"])
+def api_crm_movimentar_saldo():
+    """Lança compra a prazo (fiado) ou registra recebimento de dívida."""
+    try:
+        dados = request.json or {}
+        cpf_cnpj = (dados.get("cpf_cnpj") or "").strip()
+        tipo = dados.get("tipo")
+        valor = float(dados.get("valor", 0.0))
+        if col_clientes is not None and cpf_cnpj:
+            fator = valor if tipo == "debito" else -valor
+            col_clientes.update_one({"cpf_cnpj": cpf_cnpj}, {"$inc": {"saldo_devedor": fator}})
+            cliente_atual = col_clientes.find_one({"cpf_cnpj": cpf_cnpj}, {"_id": 0})
+            return jsonify({"sucesso": True, "cliente": cliente_atual}), 200
+        return jsonify({"erro": "Cliente não localizado"}), 404
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
+
+@app.route("/api/frotas/veiculos", methods=["GET", "POST"])
+def api_frotas_veiculos():
+    """Gerencia veículos da locadora com telemetria e bloqueio remoto."""
+    try:
+        if request.method == "POST":
+            dados = request.json or {}
+            placa = (dados.get("placa") or "").strip().upper()
+            if not placa:
+                return jsonify({"erro": "Placa é obrigatória"}), 400
+            import random
+            doc = {
+                "placa": placa,
+                "modelo": dados.get("modelo", "").strip(),
+                "ano": int(dados.get("ano", 2024)),
+                "categoria": dados.get("categoria", "Passeio"),
+                "km": float(dados.get("km", 0.0)),
+                "status": dados.get("status", "DISPONIVEL"),
+                "diaria_valor": float(dados.get("diaria_valor", 150.0)),
+                "ignicao": bool(dados.get("ignicao", False)),
+                "bloqueado": bool(dados.get("bloqueado", False)),
+                "rastreador_id": dados.get("rastreador_id", f"SAT-{random.randint(1000, 9999)}"),
+                "gps": dados.get("gps", {
+                    "lat": -23.5505,
+                    "lng": -46.6333,
+                    "endereco": "São Paulo - SP (Pátio Central)"
+                }),
+                "atualizado_em": agora_brasilia().strftime("%d/%m/%Y %H:%M:%S")
+            }
+            if col_veiculos is not None:
+                col_veiculos.update_one({"placa": placa}, {"$set": doc}, upsert=True)
+            return jsonify({"sucesso": True, "veiculo": doc}), 201
+
+        veiculos = list(col_veiculos.find({}, {"_id": 0})) if col_veiculos is not None else []
+        return jsonify(veiculos), 200
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
+
+@app.route("/api/frotas/bloqueio", methods=["POST"])
+def api_frotas_comando_bloqueio():
+    """Envia comando satelital de corte de ignição ou liberação de veículo."""
+    try:
+        dados = request.json or {}
+        placa = (dados.get("placa") or "").strip().upper()
+        if not placa:
+            return jsonify({"erro": "Placa não informada"}), 400
+        
+        veiculo = col_veiculos.find_one({"placa": placa}) if col_veiculos is not None else None
+        if not veiculo:
+            return jsonify({"erro": "Veículo não encontrado"}), 404
+        
+        novo_status_bloqueio = not veiculo.get("bloqueado", False)
+        nova_ignicao = False if novo_status_bloqueio else True
+        
+        col_veiculos.update_one(
+            {"placa": placa},
+            {"$set": {
+                "bloqueado": novo_status_bloqueio,
+                "ignicao": nova_ignicao,
+                "ultimo_comando": {
+                    "tipo": "BLOQUEIO_REMOTO" if novo_status_bloqueio else "DESBLOQUEIO_REMOTO",
+                    "data_hora": agora_brasilia().strftime("%d/%m/%Y %H:%M:%S"),
+                    "operador": "Jonas Mendonça",
+                    "status_telemetria": "COMANDO_ENTREGUE_VIA_SATELITE"
+                }
+            }}
+        )
+        return jsonify({
+            "sucesso": True,
+            "placa": placa,
+            "bloqueado": novo_status_bloqueio,
+            "ignicao": nova_ignicao,
+            "mensagem": f"Sinal de satélite transmitido! Veículo {placa} {'BLOQUEADO (Ignição Cortada)' if novo_status_bloqueio else 'DESBLOQUEADO (Liberado)'} com sucesso!"
+        }), 200
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
+
+@app.route("/api/seguros/apolices", methods=["GET", "POST"])
+def api_seguros_apolices():
+    """Gerencia contratos de locação e apólices de seguro veicular."""
+    try:
+        if request.method == "POST":
+            dados = request.json or {}
+            import random
+            num = dados.get("numero_apolice") or f"APOL-{random.randint(1000, 9999)}"
+            doc = {
+                "numero_apolice": num,
+                "veiculo_placa": dados.get("veiculo_placa", "").strip().upper(),
+                "cliente_nome": dados.get("cliente_nome", "").strip(),
+                "tipo": dados.get("tipo", "Locação com Seguro Total"),
+                "franquia": float(dados.get("franquia", 2000.0)),
+                "valor_mensal": float(dados.get("valor_mensal", 1500.0)),
+                "vigencia_fim": dados.get("vigencia_fim", "31/12/2026"),
+                "seguradora": dados.get("seguradora", "Porto Seguro Corporativo"),
+                "status": dados.get("status", "ATIVA"),
+                "cadastrado_em": agora_brasilia().strftime("%d/%m/%Y %H:%M:%S")
+            }
+            if col_apolices is not None:
+                col_apolices.update_one({"numero_apolice": num}, {"$set": doc}, upsert=True)
+            return jsonify({"sucesso": True, "apolice": doc}), 201
+
+        apolices = list(col_apolices.find({}, {"_id": 0})) if col_apolices is not None else []
+        return jsonify(apolices), 200
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
+
+def inicializar_seeds_erp():
+    """Popula dados iniciais de demonstração caso as novas coleções estejam vazias."""
+    try:
+        if col_custos is not None and col_custos.count_documents({}) == 0:
+            col_custos.insert_many([
+                {"categoria": "Espaço Físico", "descricao": "Aluguel Ponto Comercial", "valor_mensal": 1800.0, "vencimento_dia": 10},
+                {"categoria": "Utilidades", "descricao": "Energia Elétrica Comercial", "valor_mensal": 380.0, "vencimento_dia": 15},
+                {"categoria": "Comunicação", "descricao": "Internet Fibra + Telefonia", "valor_mensal": 160.0, "vencimento_dia": 5},
+                {"categoria": "Pessoal", "descricao": "Pró-Labore & Equipe", "valor_mensal": 3200.0, "vencimento_dia": 5},
+                {"categoria": "Sistemas", "descricao": "Sistemas de Nuvem & Gateway", "valor_mensal": 150.0, "vencimento_dia": 20}
+            ])
+            print("[NUVEM] Seed de custos fixos criado com sucesso!")
+
+        if col_clientes is not None and col_clientes.count_documents({}) == 0:
+            col_clientes.insert_many([
+                {"nome": "Marcos Silveira Transporte ME", "cpf_cnpj": "34.567.890/0001-12", "whatsapp": "11987654321", "endereco": "Av. Paulista, 1000 - SP", "limite_credito": 5000.0, "saldo_devedor": 450.0, "status": "ATIVO", "observacoes": "Cliente frotista, paga sempre dia 10", "cadastrado_em": "20/11/2026 10:00:00"},
+                {"nome": "Camila Fernandes de Oliveira", "cpf_cnpj": "321.654.987-00", "whatsapp": "11976543210", "endereco": "Rua Augusta, 450 - SP", "limite_credito": 1200.0, "saldo_devedor": 0.0, "status": "ATIVO", "observacoes": "Cliente VIP de acessórios e CinePro TV", "cadastrado_em": "22/11/2026 14:30:00"},
+                {"nome": "Carlos Eduardo Locações", "cpf_cnpj": "12.345.678/0001-90", "whatsapp": "11965432109", "endereco": "Av. Rebouças, 1200 - SP", "limite_credito": 10000.0, "saldo_devedor": 1200.0, "status": "ATIVO", "observacoes": "Contrato mensal de locação de 2 utilitários", "cadastrado_em": "25/11/2026 09:15:00"}
+            ])
+            print("[NUVEM] Seed de clientes CRM criado com sucesso!")
+
+        if col_veiculos is not None and col_veiculos.count_documents({}) == 0:
+            col_veiculos.insert_many([
+                {"placa": "BRA2E19", "modelo": "Fiat Fiorino 1.4 Hard Working", "ano": 2024, "categoria": "Utilitário / Carga", "km": 34200.0, "status": "ALUGADO", "diaria_valor": 160.0, "ignicao": True, "bloqueado": False, "rastreador_id": "SAT-9842", "gps": {"lat": -23.5505, "lng": -46.6333, "endereco": "Marginal Tietê, km 14 - São Paulo/SP"}, "atualizado_em": "28/11/2026 08:00:00"},
+                {"placa": "SKY4J88", "modelo": "Renault Master Chassi Baú", "ano": 2025, "categoria": "Caminhão Leve", "km": 18500.0, "status": "DISPONIVEL", "diaria_valor": 280.0, "ignicao": False, "bloqueado": False, "rastreador_id": "SAT-7711", "gps": {"lat": -23.5329, "lng": -46.6395, "endereco": "Pátio Central - Garagem Matriz SP"}, "atualizado_em": "28/11/2026 08:00:00"},
+                {"placa": "JON9M26", "modelo": "Chevrolet Onix Plus Turbo", "ano": 2024, "categoria": "Passeio / Executivo", "km": 22100.0, "status": "ALUGADO", "diaria_valor": 140.0, "ignicao": True, "bloqueado": False, "rastreador_id": "SAT-4509", "gps": {"lat": -23.5868, "lng": -46.6828, "endereco": "Av. Brigadeiro Faria Lima, 2000 - SP"}, "atualizado_em": "28/11/2026 08:00:00"}
+            ])
+            print("[NUVEM] Seed de frota veicular criado com sucesso!")
+
+        if col_apolices is not None and col_apolices.count_documents({}) == 0:
+            col_apolices.insert_many([
+                {"numero_apolice": "APOL-2026-0081", "veiculo_placa": "BRA2E19", "cliente_nome": "Marcos Silveira Transporte ME", "tipo": "Locação com Seguro Total + Rastreador", "franquia": 2500.0, "valor_mensal": 3200.0, "vigencia_fim": "15/12/2026", "seguradora": "Porto Seguro Corporativo", "status": "ATIVA", "cadastrado_em": "15/11/2026 11:00:00"},
+                {"numero_apolice": "APOL-2026-0094", "veiculo_placa": "JON9M26", "cliente_nome": "Carlos Eduardo Locações", "tipo": "Seguro de Frota Contra Terceiros + Furto", "franquia": 1800.0, "valor_mensal": 2400.0, "vigencia_fim": "20/01/2027", "seguradora": "Tokio Marine Frotas", "status": "ATIVA", "cadastrado_em": "20/11/2026 15:40:00"}
+            ])
+            print("[NUVEM] Seed de apólices e seguros criado com sucesso!")
+    except Exception as e:
+        print(f"[ERRO AO INICIALIZAR SEEDS ERP] {e}")
+
+# Executa seed de inicialização
+try:
+    inicializar_seeds_erp()
+except Exception:
+    pass
 
 
 if __name__ == "__main__":
