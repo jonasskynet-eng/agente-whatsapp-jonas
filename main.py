@@ -23,6 +23,14 @@ from pymongo.server_api import ServerApi
 
 app = Flask(__name__)
 
+@app.after_request
+def habilitar_cors_total(response):
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization,X-Requested-With'
+    response.headers['Access-Control-Allow-Methods'] = 'GET,PUT,POST,DELETE,OPTIONS'
+    return response
+
+
 # CONFIGURAÇÕES GERAIS DA EMPRESA
 CHAVE_PIX_OFICIAL = "324588e6-bd74-4b6d-9951-5321cc50ea5a"
 BANCO_RECEBEDOR = "Mercado Pago IP S.A."
@@ -311,8 +319,10 @@ def healthcheck():
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }), 200
 
-@app.route("/webhook", methods=["POST"])
+@app.route("/webhook", methods=["POST", "OPTIONS"])
 def webhook_whatsapp():
+    if request.method == "OPTIONS":
+        return jsonify({"status": "ok"}), 200
     dados = request.get_json(silent=True) or {}
     telefone = dados.get("telefone") or dados.get("phone") or dados.get("remoteJid", "").split("@")[0] or "desconhecido"
     nome = dados.get("nome") or dados.get("pushName") or "Cliente"
