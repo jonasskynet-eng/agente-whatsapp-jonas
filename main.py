@@ -1,20 +1,19 @@
 """
 ================================================================================
-AGENTE DE WHATSAPP NA NUVEM - CENTRAL TURBO MULTISSETORIAL 24/7 (VERSÃO 2.0)
+AGENTE DE WHATSAPP NA NUVEM - CENTRAL HUMANA MULTISSETORIAL 24/7 (VERSÃO 3.0)
 Jonas Tech Solutions • Conectado ao MongoDB Atlas (Cluster0 AWS São Paulo)
 ================================================================================
-Super Funcionalidades Ativadas:
-1. Personas com Áudio & Mídia (Camila CinePro, Lucas Suporte, Marcos Comercial, Jonas Humano)
-2. Leitor & Validador Inteligente de Comprovante PIX
-3. Régua Automática de Conversão (15 minutos e 1h45 de Teste)
-4. Alerta de Cliente Quente (Fila VIP de Alta Prioridade)
-5. Sistema Viral de Indicação ("Indique e Ganhe PIX")
-6. Vitrine Visual com Fotos Reais da Frente de Caixa e CinePro TV
+Atendimento natural em múltiplos balões, sem linguagem de robô/URA:
+1. Recepção acolhedora com saudação pelo horário de Brasília
+2. Camila (CinePro TV), Lucas (Suporte TI), Marcos (Comercial) e Equipe do Jonas
+3. Chave PIX enviada separada para facilitar cópia no celular
+4. Leitor inteligente de comprovante PIX e fotos de erro no suporte
+5. Controle mestre (LIGAR / DESLIGAR) pelo próprio WhatsApp ou painel
 ================================================================================
 """
 
 import os
-import json
+import random
 import urllib.parse
 from datetime import datetime, timedelta
 from flask import Flask, request, jsonify
@@ -23,11 +22,12 @@ from pymongo.server_api import ServerApi
 
 app = Flask(__name__)
 
+
 @app.after_request
 def habilitar_cors_total(response):
-    response.headers['Access-Control-Allow-Origin'] = '*'
-    response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization,X-Requested-With'
-    response.headers['Access-Control-Allow-Methods'] = 'GET,PUT,POST,DELETE,OPTIONS'
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type,Authorization,X-Requested-With"
+    response.headers["Access-Control-Allow-Methods"] = "GET,PUT,POST,DELETE,OPTIONS"
     return response
 
 
@@ -37,11 +37,9 @@ BANCO_RECEBEDOR = "Mercado Pago IP S.A."
 TITULAR_CONTA = "Jonas Mendonça"
 WHATSAPP_HUMANO = "(11) 96670-7293"
 
-# LINKS DE MÍDIA E IMAGENS OFICIAIS DEMONSTRATIVAS
+# LINKS OFICIAIS
 LINK_PLAYER_IPTV = "https://jonasskynet-eng.github.io/cine-pro-tv-2026/"
 LINK_DEMO_PDV = "http://localhost:5055/"
-FOTO_PDV_CAIXA = "https://raw.githubusercontent.com/jonasskynet-eng/sistema-comercial-pdv/main/docs/pdv_caixa_ao_vivo.png"
-FOTO_QRCODE_PIX = "https://raw.githubusercontent.com/jonasskynet-eng/sistema-comercial-pdv/main/docs/qrcode_pix_tela.png"
 
 # BANCO DE DADOS NA NUVEM (MONGODB ATLAS)
 USUARIO = os.getenv("MONGO_USER", "jonasskynet_db_user")
@@ -63,6 +61,30 @@ except Exception as e:
     alertas_col = None
     config_col = None
 
+
+def agora_brasilia():
+    """Retorna data/hora atual no fuso de Brasília (UTC-3)."""
+    return datetime.utcnow() - timedelta(hours=3)
+
+
+def saudacao_horario():
+    hora = agora_brasilia().hour
+    if 5 <= hora < 12:
+        return "Bom dia"
+    if 12 <= hora < 18:
+        return "Boa tarde"
+    return "Boa noite"
+
+
+def obter_primeiro_nome(nome):
+    if not nome:
+        return ""
+    limpo = nome.strip()
+    if limpo.lower() in ["cliente", "desconhecido", "você", "voce"]:
+        return ""
+    return limpo.split()[0].capitalize()
+
+
 def obter_status_robo():
     """Retorna True se o robô estiver ligado e False se estiver pausado pelo Jonas."""
     if config_col is not None:
@@ -74,6 +96,7 @@ def obter_status_robo():
             print(f"[ERRO STATUS ROBO]: {e}")
     return True
 
+
 def definir_status_robo(ativo: bool):
     """Grava na nuvem se o robô está ligado ou pausado."""
     if config_col is not None:
@@ -83,7 +106,7 @@ def definir_status_robo(ativo: bool):
                 {"$set": {
                     "chave": "status_robo",
                     "ativo": ativo,
-                    "atualizado_em": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    "atualizado_em": agora_brasilia().strftime("%Y-%m-%d %H:%M:%S")
                 }},
                 upsert=True
             )
@@ -93,16 +116,6 @@ def definir_status_robo(ativo: bool):
             print(f"[ERRO ATUALIZAR STATUS]: {e}")
     return False
 
-def obter_menu_principal(nome_cliente):
-    return (
-        f"Olá, {nome_cliente}! Seja muito bem-vindo(a) à *Jonas Tech Solutions*! 🚀\n\n"
-        f"Para direcionarmos o seu atendimento com máxima rapidez, *escolha o setor desejado:*\n\n"
-        f"1️⃣ 📺 *Central CinePro TV* (Testes Grátis de 2h, Filmes, Séries & Futebol)\n"
-        f"2️⃣ 💻 *Suporte Técnico Especializado* (Sistemas, PDV & Otimização Windows)\n"
-        f"3️⃣ 💼 *Departamento Comercial & Vendas* (Sistema PDV R$ 150, Robôs & PIX)\n"
-        f"4️⃣ 👤 *Falar Diretamente com o Jonas* (Plantão Humano VIP)\n\n"
-        f"👉 *Digite apenas o NÚMERO (1, 2, 3 ou 4)* da opção desejada:"
-    )
 
 def disparar_alerta_cliente_quente(telefone, nome, motivo, valor=None):
     """Registra alerta prioritário na nuvem para o celular do Jonas."""
@@ -114,31 +127,61 @@ def disparar_alerta_cliente_quente(telefone, nome, motivo, valor=None):
                 "motivo": motivo,
                 "valor_estimado": valor,
                 "status": "URGENTE_NAO_LIDO",
-                "criado_em": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                "criado_em": agora_brasilia().strftime("%Y-%m-%d %H:%M:%S")
             })
             print(f"[ALERTA QUENTE] Cliente {nome} ({telefone}) sinalizado como URGENTE!")
         except Exception as e:
             print(f"[ERRO ALERTA]: {e}")
 
+
+def obter_recepcao_natural(pnome):
+    saudacao = saudacao_horario()
+    virgula_nome = f", {pnome}" if pnome else ""
+    abertura = random.choice([
+        f"Oi{virgula_nome}! {saudacao}, tudo bem por aí? 😊",
+        f"Opa{virgula_nome}! {saudacao}, tudo joia?"
+    ])
+    corpo = (
+        "Aqui é da equipe do Jonas! Me conta, como posso te ajudar hoje? "
+        "Você tá procurando o teste grátis da TV, nosso sistema de caixa e estoque ou precisa de suporte pro computador?"
+    )
+    return [abertura, corpo]
+
+
 def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tipo_midia="text"):
-    texto = mensagem.strip().lower()
+    texto = (mensagem or "").strip().lower()
+    pnome = obter_primeiro_nome(nome)
+    virgula_nome = f", {pnome}" if pnome else ""
     dados_extras = {}
-    
+
     # 0. COMANDO MESTRE DO JONAS PARA LIGAR OU DESLIGAR O ROBÔ POR MENSAGEM
     tel_limpo = "".join(c for c in str(telefone) if c.isdigit())
-    eh_jonas = tel_limpo.endswith("966707293") or "jonas" in nome.lower()
-    
+    eh_jonas = tel_limpo.endswith("966707293") or "jonas" in (nome or "").lower()
+
     if eh_jonas and texto in ["desligar", "pausar", "dormir", "parar", "#desligar", "#pausar"]:
         definir_status_robo(False)
-        return "ROBO_PAUSADO", "Sistema de Controle Jonas Tech", "🔴 *ROBÔ PAUSADO COM SUCESSO!*\n\nA Central de Atendimento foi desligada. Nenhuma mensagem de cliente será respondida automaticamente até você mandar *LIGAR*.", {"robo_ativo": False}
-        
+        return (
+            "ROBO_PAUSADO",
+            "Controle Jonas Tech",
+            [
+                "Prontinho, Jonas! Pausei o atendimento automático por aqui. 🔴",
+                "Pode conversar tranquilo que não vou responder ninguém até você me mandar *ligar*."
+            ],
+            {"robo_ativo": False}
+        )
+
     if eh_jonas and texto in ["ligar", "ativar", "acordar", "#ligar", "#ativar"]:
         definir_status_robo(True)
-        return "ROBO_ATIVADO", "Sistema de Controle Jonas Tech", "🟢 *ROBÔ ATIVADO COM SUCESSO!*\n\nA Central Multissetorial voltou a operar 24 horas por dia normalmente.", {"robo_ativo": True}
+        return (
+            "ROBO_ATIVADO",
+            "Controle Jonas Tech",
+            ["Tudo certo, Jonas! Já voltei a atender o pessoal normalmente por aqui. 🟢"],
+            {"robo_ativo": True}
+        )
 
-    # SE O ROBÔ ESTIVER DESLIGADO, ELE FICA EM SILÊNCIO TOTAL
+    # SE O ROBÔ ESTIVER DESLIGADO, FICA EM SILÊNCIO TOTAL
     if not obter_status_robo():
-        return "ROBO_PAUSADO", "Robô em Silêncio", "", {"robo_ativo": False, "ignorado": True}
+        return "ROBO_PAUSADO", "Pausado", [], {"robo_ativo": False, "ignorado": True}
 
     # 1. Recuperar histórico do lead no MongoDB Atlas
     lead = None
@@ -149,175 +192,193 @@ def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tip
             print(f"[ERRO BUSCA LEAD]: {e}")
 
     setor_atual = (lead or {}).get("setor_atual", "MENU_INICIAL")
-    dados_extras = {}
 
-    # 2. DETECTOR DE COMPROVANTE PIX (Leitor Inteligente)
-    palavras_comprovante = ["comprovante", "paguei", "ta pago", "tá pago", "pix feito", "concluido", "transferido", "segue o comprovante"]
-    if tipo_midia in ["image", "document"] or any(p in texto for p in palavras_comprovante):
+    # 2. DETECTOR INTELIGENTE DE COMPROVANTE PIX (preservando fotos de erro no Suporte)
+    palavras_comprovante = [
+        "comprovante", "paguei", "ta pago", "tá pago", "pix feito",
+        "concluido", "concluído", "transferido", "mandei o pix", "fiz o pix"
+    ]
+    eh_pagamento_texto = any(p in texto for p in palavras_comprovante)
+    eh_midia_fora_suporte = tipo_midia in ["image", "document"] and setor_atual != "SETOR_2_SUPORTE"
+
+    if eh_pagamento_texto or eh_midia_fora_suporte:
         novo_setor = "PAGAMENTO_RECEBIDO"
-        atendente = "Robô Validador Financeiro Jonas Tech"
-        
-        # Identificar se é IPTV (R$ 30) ou Sistema PDV (R$ 150)
-        produto_identificado = "Sistema Comercial PDV" if "150" in texto or setor_atual == "SETOR_3_COMERCIAL" else "CinePro TV 30 Dias"
-        
-        resposta = (
-            f"🎉 *COMPROVANTE RECEBIDO COM SUCESSO, {nome.upper()}!*\n\n"
-            f"Nosso sistema financeiro já identificou o seu pagamento para o serviço: *{produto_identificado}*.\n\n"
-            f"✅ *Status da Transação:* APROVADO & VERIFICADO NO MERCADO PAGO\n"
-            f"👤 *Titular Beneficiário:* {TITULAR_CONTA}\n"
-            f"📅 *Data:* {datetime.now().strftime('%d/%m/%Y às %H:%M')}\n\n"
-            f"🎁 *LIBERAÇÃO DO SEU ACESSO:*\n"
-            f"• Seus dados de login ou link de download seguro já foram ativados com prioridade máxima!\n"
-            f"• Qualquer dúvida, o Jonas também já recebeu a notificação da sua compra e está à disposição.\n\n"
-            f"🤝 *PROGRAMA INDIQUE E GANHE PIX:*\n"
-            f"Indique 1 amigo ou comerciante que fechar com a gente e receba *R$ 20,00 no PIX direto na sua conta*! Basta pedir para ele nos chamar aqui informando que foi indicado por você!"
-        )
+        atendente = "Financeiro Jonas Tech"
+        produto_identificado = "Sistema Comercial PDV" if ("150" in texto or setor_atual == "SETOR_3_COMERCIAL") else "CinePro TV 30 Dias"
+
+        baloes = [
+            f"Opa{virgula_nome}! Recebi seu comprovante aqui, muito obrigado pela confiança! 🙏",
+            (
+                "Já avisei o Jonas pra conferir aqui no Mercado Pago e liberar seu acesso certinho em instantes.\n\n"
+                "Ah, e se indicar algum amigo ou comércio conhecido que fechar com a gente, te mando R$ 20 no PIX na hora como agradecimento, viu? Qualquer coisa tô por aqui!"
+            )
+        ]
         dados_extras["status_pagamento"] = "COMPROVANTE_ENVIADO"
         dados_extras["produto_comprado"] = produto_identificado
-        disparar_alerta_cliente_quente(telefone, nome, f"COMPROVANTE DE PAGAMENTO ENVIADO ({produto_identificado})", 30.0 if "30" in produto_identificado else 150.0)
-        return novo_setor, atendente, resposta, dados_extras
+        disparar_alerta_cliente_quente(
+            telefone, nome,
+            f"COMPROVANTE DE PAGAMENTO ENVIADO ({produto_identificado})",
+            30.0 if "30" in produto_identificado else 150.0
+        )
+        return novo_setor, atendente, baloes, dados_extras
 
-    # 3. COMANDO UNIVERSAL DE VOLTAR
-    if any(cmd in texto for cmd in ["menu", "voltar", "inicio", "início", "opcoes", "opções", "sair"]):
+    # 3. RESET NATURAL POR SAUDAÇÃO PURA OU VOLTAR
+    saudacoes_puras = [
+        "oi", "olá", "ola", "opa", "bom dia", "boa tarde", "boa noite",
+        "e ai", "e aí", "tudo bem", "tudo bem?", "oi tudo bem",
+        "menu", "voltar", "inicio", "início"
+    ]
+    if texto in saudacoes_puras:
         setor_atual = "MENU_INICIAL"
 
-    # 4. ROTEAMENTO DINÂMICO INTELIGENTE (POR NÚMERO OU POR INTENÇÃO NATURAL)
+    # 4. TROCA INTELIGENTE DE ASSUNTO NO MEIO DA CONVERSA
+    if any(p in texto for p in ["falar com jonas", "falar com o jonas", "chama o jonas", "atendente humano", "falar com humano"]):
+        setor_atual = "MENU_INICIAL"
+    elif setor_atual == "SETOR_1_CINEPRO" and any(p in texto for p in ["pdv", "sistema de caixa", "estoque", "150", "pc lento", "formatar"]):
+        setor_atual = "MENU_INICIAL"
+
+    # 5. ROTEAMENTO CONVERSACIONAL HUMANO
     if setor_atual == "MENU_INICIAL":
-        if any(p in texto for p in ["1", "tv", "iptv", "cinepro", "teste", "futebol", "canais", "filme", "série", "serie"]):
+        if any(p in texto for p in ["1", "tv", "iptv", "cinepro", "teste", "futebol", "canais", "filme", "série", "serie", "jogo"]):
             novo_setor = "SETOR_1_CINEPRO"
-            atendente = "Camila • Especialista CinePro TV"
-            agora = datetime.now()
+            atendente = "Camila"
+            agora = agora_brasilia()
             dados_extras["teste_iniciado_em"] = agora.strftime("%Y-%m-%d %H:%M:%S")
             dados_extras["horario_regua_15min"] = (agora + timedelta(minutes=15)).strftime("%Y-%m-%d %H:%M:%S")
             dados_extras["horario_regua_expira"] = (agora + timedelta(hours=2)).strftime("%Y-%m-%d %H:%M:%S")
-            resposta = (
-                f"Olá, {nome}! Aqui é a *Camila*, especialista da *Central CinePro TV*! 📺✨\n\n"
-                f"Seu *Teste Grátis de 2 Horas* já está 100% liberado para você assistir agora mesmo no celular, computador ou Smart TV!\n\n"
-                f"🔗 *Clique no link abaixo para abrir o seu player oficial:*\n"
-                f"👉 {LINK_PLAYER_IPTV}\n\n"
-                f"🍿 São mais de 780 canais em Full HD, filmes recém-lançados do cinema e todos os jogos de futebol ao vivo sem travamento.\n\n"
-                f"⏰ Daqui a 15 minutinhos vou te mandar uma mensagem rápida para confirmar se a imagem abriu perfeita aí pra você!\n\n"
-                f"_(Para voltar ao menu geral a qualquer momento, basta digitar *MENU*)_"
-            )
-        elif any(p in texto for p in ["2", "suporte", "tecnico", "técnico", "defeito", "erro", "formatar", "pc lento", "windows", "ajuda", "conserto", "travando"]):
+            baloes = [
+                f"Oi{virgula_nome}! Tudo bom? Aqui é a Camila 😊 Já deixei liberado seu teste grátis de 2 horas pra você ver a qualidade!",
+                (
+                    f"É só tocar nesse link aqui pra abrir:\n{LINK_PLAYER_IPTV}\n\n"
+                    "Pega direto no celular, computador ou Smart TV, com todos os canais, filmes novos e jogos ao vivo. Abre aí rapidinho e me conta se rodou lisinho!"
+                )
+            ]
+        elif any(p in texto for p in ["2", "suporte", "tecnico", "técnico", "defeito", "erro", "formatar", "pc", "computador", "notebook", "lento", "windows", "ajuda", "conserto", "travando"]):
             novo_setor = "SETOR_2_SUPORTE"
-            atendente = "Lucas • Suporte Técnico Jonas Tech"
-            resposta = (
-                f"Olá, {nome}! Aqui é o *Lucas* da bancada de *Suporte Técnico da Jonas Tech*! 💻🛠️\n\n"
-                f"Estou a postos para resolver o seu problema com máxima agilidade. Como posso te ajudar hoje?\n\n"
-                f"• ⚡ *Computador ou Notebook lento/travando:* Aplicamos nossa suíte *Windows Boost PRO* com 131 drivers;\n"
-                f"• 🏪 *Sistema Comercial PDV Caixa 5055:* Dúvidas de instalação, leitor de código de barras ou banco de dados;\n"
-                f"• 📸 *Erro na tela:* Pode tirar uma foto ou print da sua tela e enviar aqui nesta conversa!\n\n"
-                f"Me conte em detalhes o que está acontecendo para eu te orientar agora mesmo.\n\n"
-                f"_(Para trocar de setor, digite *MENU*)_"
-            )
-        elif any(p in texto for p in ["3", "venda", "comercial", "comprar", "preco", "preço", "sistema pdv", "pix", "150", "quanto custa", "valor", "tabela"]):
+            atendente = "Lucas"
+            baloes = [
+                f"Fala{virgula_nome}! Tudo tranquilo? Aqui é o Lucas, do suporte técnico.",
+                "Me conta o que tá acontecendo aí: é computador lento/travando ou alguma dúvida no sistema de caixa? Se tiver aparecendo algum erro na tela, pode tirar uma foto mesmo pelo celular e mandar aqui!"
+            ]
+        elif any(p in texto for p in ["3", "venda", "comercial", "comprar", "preco", "preço", "sistema", "pdv", "caixa", "estoque", "150", "quanto custa", "valor", "tabela", "robô", "robo"]):
             novo_setor = "SETOR_3_COMERCIAL"
-            atendente = "Marcos • Consultor Comercial"
-            resposta = (
-                f"Olá, {nome}! Tudo bem? Sou o *Marcos*, do *Departamento Comercial da Jonas Tech*! 💼🤝\n\n"
-                f"Aqui estão as nossas soluções oficiais prontas para entrega imediata:\n\n"
-                f"🏪 *1. Sistema Comercial PDV & Estoque:* R$ 150,00 (Taxa única, SEM mensalidades, banco em nuvem e PIX)\n"
-                f"⚡ *2. Suíte Windows Boost PRO:* R$ 150,00 (Bancada técnica completa) ou Versão LITE por R$ 30,00\n"
-                f"🤖 *3. Robô de WhatsApp 24/7 na Nuvem:* R$ 250,00 (Atendimento automático sem PC ligado)\n"
-                f"📺 *4. CinePro TV 30 Dias Completo:* R$ 30,00 mensais\n"
-                f"🔥 *5. Combo Modernização 3 em 1:* R$ 350,00\n\n"
-                f"🔑 *Chave PIX Oficial Mercado Pago:*\n`{CHAVE_PIX_OFICIAL}`\n"
-                f"🏛️ *Banco:* {BANCO_RECEBEDOR} | Titular: {TITULAR_CONTA}\n\n"
-                f"Qual dessas soluções você deseja implantar hoje? Me avise para eu gerar o seu acesso!\n\n"
-                f"_(Para voltar às opções, digite *MENU*)_"
-            )
-        elif any(p in texto for p in ["4", "jonas", "humano", "pessoa", "atendente", "falar com jonas"]):
+            atendente = "Marcos"
+            baloes = [
+                f"Opa{virgula_nome}! Tudo bem? Aqui é o Marcos, cuido da parte comercial aqui com o Jonas.",
+                (
+                    "Hoje o que mais sai aqui é o nosso *Sistema de Frente de Caixa e Estoque (PDV)* por R$ 150 pagamento único — você paga uma vez só e não tem mensalidade nunca mais!\n\n"
+                    "Também temos o pacote Windows Boost PRO (R$ 150), automação de WhatsApp (R$ 250) e a TV completa (R$ 30). Qual deles você queria ver melhor?"
+                )
+            ]
+        elif any(p in texto for p in ["4", "jonas", "humano", "pessoa", "dono"]):
             novo_setor = "SETOR_4_JONAS_HUMANO"
-            atendente = "Jonas Mendonça (Fundador)"
+            atendente = "Equipe do Jonas"
+            dados_extras["avisou_aguardo_humano"] = False
             disparar_alerta_cliente_quente(telefone, nome, "CLIENTE SOLICITOU ATENDIMENTO HUMANO COM O JONAS")
-            resposta = (
-                f"Perfeito, {nome}! 👤\n\n"
-                f"Você solicitou atendimento direto com o *Jonas Mendonça*.\n\n"
-                f"🚨 *Aviso do Sistema:* Notifiquei o celular do Jonas agora mesmo como *Atendimento Prioritário VIP*! Como ele pode estar em bancada ou em atendimento externo, ele te responderá pessoalmente aqui nesta mesma conversa em instantes!\n\n"
-                f"Por favor, já deixe escrita a sua dúvida ou projeto para ele agilizar o seu retorno."
-            )
+            baloes = [
+                f"Pode deixar{virgula_nome}! Já dei um toque no celular pessoal do Jonas pra ele assumir nossa conversa aqui.",
+                "Se quiser, já pode ir mandando sua dúvida ou áudio aqui que assim que ele soltar o atendimento ali já te responde direto, combinado?"
+            ]
         else:
             novo_setor = "MENU_INICIAL"
-            atendente = "Central Automática Jonas Tech"
-            resposta = obter_menu_principal(nome)
+            atendente = "Recepção Jonas Tech"
+            baloes = obter_recepcao_natural(pnome)
 
     elif setor_atual == "SETOR_1_CINEPRO":
-        atendente = "Camila • Especialista CinePro TV"
+        atendente = "Camila"
         novo_setor = "SETOR_1_CINEPRO"
-        if any(p in texto for p in ["pix", "pagar", "comprar", "assinar", "quero", "ativar", "30"]):
+        if any(p in texto for p in ["pix", "pagar", "comprar", "assinar", "quero fechar", "quero assinar", "ativar", "chave", "mensal", "quanto é", "quanto custa", "valor"]):
             disparar_alerta_cliente_quente(telefone, nome, "CLIENTE QUER PAGAR CINEPRO TV R$ 30", 30.0)
-            resposta = (
-                f"Show de bola, {nome}! 🎉\n\n"
-                f"Para ativar o seu acesso mensal de 30 dias com todos os 780 canais liberados, o valor promocional é de apenas *R$ 30,00*:\n\n"
-                f"🔑 *Chave PIX Mercado Pago (Copia e Cola):*\n`{CHAVE_PIX_OFICIAL}`\n"
-                f"🏛️ *Banco:* {BANCO_RECEBEDOR} | Titular: {TITULAR_CONTA}\n\n"
-                f"Assim que fizer o PIX, me mande o comprovante aqui que eu já emito a sua chave de login definitiva e o recibo digital!"
-            )
+            baloes = [
+                f"Fechou{virgula_nome}! O plano completo de 30 dias fica só R$ 30,00. Vou te mandar a chave PIX separada aqui embaixo pra ficar fácil de copiar:",
+                f"{CHAVE_PIX_OFICIAL}",
+                f"Vai aparecer no nome de {TITULAR_CONTA} ({BANCO_RECEBEDOR}). Assim que fizer, me manda o comprovante aqui mesmo que já libero seu login definitivo!"
+            ]
+        elif any(p in texto for p in ["smart", "samsung", "lg", "roku", "tv box", "box", "fire", "android", "como instala", "colocar na tv"]):
+            baloes = [
+                "Na Smart TV é bem simples! Dá pra abrir direto pelo navegador da própria TV usando aquele link, ou instalar o app rapidinho.",
+                "Qual é a marca da sua TV aí (Samsung, LG, Roku ou TV Box)? Me fala que te explico certinho como colocar!"
+            ]
+        elif any(p in texto for p in ["abriu", "funcionou", "top", "bom", "gostei", "rodou", "show", "ótimo", "otimo", "sim", "deu certo"]):
+            baloes = [
+                f"Que massa{virgula_nome}, fico feliz que rodou liso aí! 😄",
+                "Aproveita bastante o teste! Se já quiser deixar o mês completo garantido por R$ 30, é só me pedir o PIX por aqui, tá bom?"
+            ]
+        elif any(p in texto for p in ["travou", "não abriu", "nao abriu", "erro", "carregando"]):
+            baloes = [
+                "Eita, vamos ver isso agora! Você tentou abrir pelo Wi-Fi ou pelos dados móveis do celular?",
+                "Tenta atualizar a página uma vez — às vezes na primeira abertura leva uns 5 segundinhos pra carregar a grade. Me fala se entrou!"
+            ]
         else:
-            resposta = (
-                f"Perfeito, {nome}! A imagem abriu certinho no seu aparelho através do link {LINK_PLAYER_IPTV} ?\n\n"
-                f"Se precisar de ajuda com a configuração ou quiser assinar o plano completo de R$ 30,00, é só me falar aqui! *(Digite MENU para voltar)*"
-            )
+            baloes = [
+                f"Me conta aí{virgula_nome}, conseguiu abrir o link da TV no seu aparelho?",
+                "Qualquer dúvida na configuração ou se quiser ativar o acesso mensal de R$ 30, é só me chamar aqui!"
+            ]
 
     elif setor_atual == "SETOR_2_SUPORTE":
-        atendente = "Lucas • Suporte Técnico Jonas Tech"
+        atendente = "Lucas"
         novo_setor = "SETOR_2_SUPORTE"
-        resposta = (
-            f"Entendido, {nome}! Registrei o seu chamado na nossa bancada técnica com o protocolo técnico #TI-{int(datetime.now().timestamp()) % 100000}.\n\n"
-            f"Se for um erro no computador ou no PDV, pode tirar uma foto da tela e enviar aqui. "
-            f"Estou analisando para te passar a solução exata em instantes! *(Digite MENU para voltar)*"
-        )
+        if tipo_midia in ["image", "document"]:
+            disparar_alerta_cliente_quente(telefone, nome, "CLIENTE ENVIOU FOTO DE ERRO NO SUPORTE")
+            baloes = [
+                f"Boa{virgula_nome}, recebi a imagem da tela aqui!",
+                "Já passei pro Jonas analisar junto comigo na bancada e já te damos o retorno certinho por aqui mesmo em instantes!"
+            ]
+        else:
+            baloes = [
+                f"Entendi perfeitamente{virgula_nome}!",
+                "Já anotei tudo aqui na bancada e chamei o Jonas pra gente resolver isso da forma mais rápida pra você. Se conseguir mandar uma foto da tela também, ajuda demais!"
+            ]
 
     elif setor_atual == "SETOR_3_COMERCIAL":
-        atendente = "Marcos • Consultor Comercial"
+        atendente = "Marcos"
         novo_setor = "SETOR_3_COMERCIAL"
-        if any(p in texto for p in ["pix", "chave", "pagar", "comprar", "quero o sistema"]):
+        if any(p in texto for p in ["pix", "chave", "pagar", "comprar", "quero", "fechar", "manda"]):
             disparar_alerta_cliente_quente(telefone, nome, "CLIENTE QUER PAGAR SISTEMA COMERCIAL R$ 150", 150.0)
-            resposta = (
-                f"Excelente decisão, {nome}! Seguem os dados oficiais de pagamento com liberação imediata:\n\n"
-                f"🏪 *Item:* Licença Vitalícia Sistema Comercial PDV & Controle de Estoque\n"
-                f"💰 *Valor Único:* R$ 150,00 (SEM MENSALIDADES)\n\n"
-                f"🔑 *Chave PIX Oficial Mercado Pago:*\n`{CHAVE_PIX_OFICIAL}`\n"
-                f"👤 *Titular:* {TITULAR_CONTA} | Banco: {BANCO_RECEBEDOR}\n\n"
-                f"Assim que concluir, envie o comprovante nesta conversa para eu dar baixa no sistema e liberar a sua instalação imediata!"
-            )
+            baloes = [
+                f"Combinado{virgula_nome}! A licença vitalícia do sistema completo com nosso suporte fica R$ 150,00 taxa única. Segue a chave PIX separada pra você copiar:",
+                f"{CHAVE_PIX_OFICIAL}",
+                f"Confere lá no nome de {TITULAR_CONTA} ({BANCO_RECEBEDOR}). Assim que transferir, me manda o comprovante aqui que já libero seus arquivos de instalação na hora!"
+            ]
         else:
-            resposta = (
-                f"Excelente, {nome}! O investimento no nosso Sistema Comercial é de taxa única de R$ 150,00 no PIX, sem mensalidades.\n\n"
-                f"Deseja que eu te envie a chave PIX agora para garantir a sua licença vitalícia com suporte incluído? *(Digite MENU para voltar)*"
-            )
+            baloes = [
+                "O legal desse sistema é que ele já lê código de barras, controla o estoque certinho, gera cobrança PIX na tela e não te cobra mensalidade todo mês.",
+                "Quer que eu te mande a chave PIX pra gente já deixar instalado aí no seu comércio hoje?"
+            ]
 
     elif setor_atual == "SETOR_4_JONAS_HUMANO":
-        atendente = "Jonas Mendonça (Fundador)"
+        atendente = "Equipe do Jonas"
         novo_setor = "SETOR_4_JONAS_HUMANO"
-        resposta = (
-            f"Mensagem registrada para o Jonas, {nome}! O alerta de alta prioridade foi disparado para ele e ele vai responder diretamente por aqui em breve. Obrigado pela confiança!"
-        )
+        if (lead or {}).get("avisou_aguardo_humano"):
+            return novo_setor, "Aguardando Jonas", [], {}
+        dados_extras["avisou_aguardo_humano"] = True
+        baloes = ["Anotei aqui pra ele ver assim que pegar no celular, fica tranquilo! 👍"]
 
     else:
         novo_setor = "MENU_INICIAL"
-        atendente = "Central Automática Jonas Tech"
-        resposta = obter_menu_principal(nome)
+        atendente = "Recepção Jonas Tech"
+        baloes = obter_recepcao_natural(pnome)
 
-    return novo_setor, atendente, resposta, dados_extras
+    return novo_setor, atendente, baloes, dados_extras
+
 
 @app.route("/", methods=["GET"])
 def healthcheck():
     return jsonify({
         "status": "online",
-        "servico": "Central de Atendimento Turbo Multissetorial 24/7 - Jonas Tech Solutions",
-        "versao": "2.0_TURBO_IA",
+        "servico": "Central Humana Multissetorial 24/7 - Jonas Tech Solutions",
+        "versao": "3.0_HUMANO_REAL",
         "banco": "MongoDB Atlas Conectado",
         "recursos_ativos": [
-            "1. Personas Especializadas (Camila, Lucas, Marcos, Jonas)",
-            "2. Leitor & Validador Inteligente de Comprovante PIX",
-            "3. Régua Automática de Conversão (15 min e 1h45)",
-            "4. Fila VIP de Alertas Quentes para o Jonas",
-            "5. Motor de Indicação Viral R$ 20 PIX"
+            "1. Diálogo Humano em Múltiplos Balões (Sem Menu URA)",
+            "2. Personas Naturais (Recepção, Camila, Lucas, Marcos, Equipe do Jonas)",
+            "3. Chave PIX Separada para Cópia Fácil",
+            "4. Leitor Inteligente de Comprovante e Foto de Erro no Suporte",
+            "5. Fila VIP de Alertas Quentes & Controle LIGAR/DESLIGAR"
         ],
-        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        "timestamp": agora_brasilia().strftime("%Y-%m-%d %H:%M:%S")
     }), 200
+
 
 @app.route("/webhook", methods=["POST", "OPTIONS"])
 def webhook_whatsapp():
@@ -333,7 +394,8 @@ def webhook_whatsapp():
     if not mensagem and tipo_midia == "text":
         return jsonify({"erro": "Nenhuma mensagem encontrada no payload"}), 400
 
-    novo_setor, atendente, resposta, extras = processar_mensagem_inteligente(telefone, nome, mensagem, midia_url, tipo_midia)
+    novo_setor, atendente, lista_baloes, extras = processar_mensagem_inteligente(telefone, nome, mensagem, midia_url, tipo_midia)
+    resposta_consolidada = "\n\n".join(lista_baloes)
 
     # Gravação no MongoDB Atlas
     if leads_col is not None:
@@ -343,9 +405,9 @@ def webhook_whatsapp():
                 "setor_atual": novo_setor,
                 "atendente_responsavel": atendente,
                 "ultima_mensagem": mensagem,
-                "resposta": resposta,
-                "status": "EM_ATENDIMENTO_TURBO",
-                "atualizado_em": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                "resposta": resposta_consolidada,
+                "status": "EM_ATENDIMENTO_HUMANO",
+                "atualizado_em": agora_brasilia().strftime("%Y-%m-%d %H:%M:%S")
             }
             update_data.update(extras)
             leads_col.update_one({"telefone": telefone}, {"$set": update_data}, upsert=True)
@@ -357,13 +419,16 @@ def webhook_whatsapp():
         "destinatario": telefone,
         "setor_atual": novo_setor,
         "atendente": atendente,
-        "resposta_pronta": resposta,
+        "mensagens_humanas": lista_baloes,
+        "resposta_pronta": resposta_consolidada,
         "dados_extras": extras
     }), 200
+
 
 @app.route("/api/robo/status", methods=["GET"])
 def api_robo_status():
     return jsonify({"ativo": obter_status_robo()}), 200
+
 
 @app.route("/api/robo/alternar", methods=["POST", "GET"])
 def api_robo_alternar():
@@ -371,15 +436,18 @@ def api_robo_alternar():
     definir_status_robo(novo)
     return jsonify({"ativo": novo, "status": "LIGADO" if novo else "PAUSADO"}), 200
 
+
 @app.route("/api/robo/ligar", methods=["POST", "GET"])
 def api_robo_ligar():
     definir_status_robo(True)
     return jsonify({"ativo": True, "status": "LIGADO"}), 200
 
+
 @app.route("/api/robo/desligar", methods=["POST", "GET"])
 def api_robo_desligar():
     definir_status_robo(False)
     return jsonify({"ativo": False, "status": "PAUSADO"}), 200
+
 
 if __name__ == "__main__":
     porta = int(os.environ.get("PORT", 8080))
