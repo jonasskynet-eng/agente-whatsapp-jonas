@@ -375,11 +375,13 @@ def obter_recepcao_natural(pnome):
     return [abertura, corpo]
 
 
-def diagnosticar_suporte_lucas(pnome, nome, telefone, mensagem, tipo_midia, texto_comprovante):
-    """Retorna (baloes, notificacao_jonas) para o Lucas resolver problemas reais e registrar no relatório."""
+def diagnosticar_suporte_lucas(pnome, nome, telefone, mensagem, tipo_midia, texto_comprovante, resposta_anterior=""):
+    """Retorna (baloes, notificacao_jonas) para o Lucas resolver problemas reais com anti-loop."""
     virgula_nome = f", {pnome}" if pnome else ""
     texto = (mensagem or "").strip().lower()
+    texto_ascii = normalizar_ascii(texto)
     notificacao = None
+    ja_atendeu_antes = "Lucas" in (resposta_anterior or "")
 
     if tipo_midia in ["image", "document"]:
         texto_tela = (texto_comprovante or mensagem or "").strip()
@@ -399,66 +401,94 @@ def diagnosticar_suporte_lucas(pnome, nome, telefone, mensagem, tipo_midia, text
         ]
         return baloes, notificacao
 
-    if any(p in texto for p in ["travando", "engasgando", "oscilando", "carregando", "bolinha", "internet", "rede", "wifi", "wi-fi", "lenta", "rota", "dns"]):
+    # 1. Como colocar / instalar / abrir na Smart TV ou TV Box
+    if any(p in texto_ascii for p in [
+        "colocar na tv", "coloca na tv", "botar na tv", "bota na tv", "por na tv",
+        "instalar na tv", "instala na tv", "assistir na tv", "ver na tv", "abrir na tv",
+        "como coloca", "samsung", "lg", "roku", "tcl", "philco", "aoc", "tv box",
+        "box", "fire", "android tv", "chromecast", "espelhar", "smart"
+    ]):
+        registrar_evento_email(
+            "SUPORTE_TECNICO", nome, telefone, 0.0,
+            mensagem[:180],
+            "Passo a passo enviado para abrir a Central TV pelo navegador da Smart TV/Box ou espelhamento."
+        )
+        baloes = [
+            f"É bem fácil colocar na TV{virgula_nome}! Você tem 2 jeitos simples de abrir:",
+            (
+                f"1️⃣ *Pelo navegador da Smart TV ou TV Box:* abra o navegador (Internet/Browser) da TV e entre no link:\n{LINK_PLAYER_IPTV}\n\n"
+                "2️⃣ *Espelhando do celular:* abra esse mesmo link no celular e toque em *Transmitir / Smart View / Espelhar Tela* para jogar a imagem direto na televisão."
+            ),
+            "Qual é a marca ou modelo da sua TV (Samsung, LG, Roku, TCL ou TV Box)? Se aparecer algum aviso na tela, pode me mandar uma foto aqui que te guio passo a passo!"
+        ]
+        return baloes, notificacao
+
+    # 2. TV ou canal parou de funcionar / travou / não abre / sem sinal
+    if any(p in texto_ascii for p in [
+        "parou", "nao funciona", "não funciona", "nao pega", "não pega",
+        "nao entra", "não entra", "nao carrega", "não carrega", "travou", "travado",
+        "congelou", "caiu", "saiu do ar", "deu erro", "canal", "canais", "fora do ar",
+        "sem som", "mudo", "tela preta", "nao abre", "não abre", "0:00", "sumiu", "sinal"
+    ]):
+        notificacao = f"🛠️ *CHAMADO DE TV / SINAL (LUCAS):*\n👤 {nome} ({telefone})\n💬 Relato: {(mensagem or '')[:160]}"
+        registrar_evento_email(
+            "SUPORTE_TECNICO", nome, telefone, 0.0,
+            mensagem[:180],
+            "Orientação de reinício 30s na TV/roteador, destravamento de áudio/play (0:00) e triagem de canal."
+        )
+        baloes = [
+            f"Vamos resolver isso agora{virgula_nome}! Quando a TV para de funcionar ou não abre o canal, faz esses 3 passos rápidos que resolvem na hora:",
+            (
+                "1️⃣ *Reinicie a rede e a TV:* tire a TV (ou TV Box) e o roteador da tomada por *30 segundos* e ligue de novo.\n"
+                "2️⃣ *Destrave o player:* se abrir parado em 0:00 ou sem som, toque no botão de *Áudio/Play* na tela ou troque pro canal vizinho e volte.\n"
+                f"3️⃣ *Recarregue o endereço:* feche e abra de novo o link {LINK_PLAYER_IPTV} no navegador."
+            ),
+            "Me responde só 2 coisinhas pra eu ir direto no problema se continuar: parou em *todos os canais* ou em *um só*? E você está assistindo pelo *celular*, *Smart TV* ou *TV Box*?"
+        ]
+        return baloes, notificacao
+
+    # 3. Oscilação de Wi-Fi / internet lenta / buffering
+    if any(p in texto_ascii for p in ["travando", "engasgando", "oscilando", "carregando", "bolinha", "internet", "rede", "wifi", "wi-fi", "lenta", "rota", "dns"]):
         registrar_evento_email(
             "SUPORTE_TECNICO", nome, telefone, 0.0,
             mensagem[:180],
             "Orientação de troca para Wi-Fi 5G / cabo e reinício de 30s no roteador para renovar DNS."
         )
         baloes = [
-            f"Vamos resolver essa oscilação agora{virgula_nome}! Aqui é o Lucas, do suporte.",
-            "Quase sempre que dá essas engasgadas à noite é rota congestionada da operadora ou interferência no Wi-Fi comum. Tenta conectar na rede 5G do seu roteador (ou cabo na TV) e tira o roteador da tomada por uns 30 segundos pra renovar o DNS.",
-            "Me fala também: tá travando em todos os canais ou em um específico? E você tá assistindo na Smart TV, TV Box ou celular?"
+            f"Vamos estabilizar essa conexão agora{virgula_nome}!",
+            "Quase sempre que dá essas engasgadas é oscilação do Wi-Fi comum ou rota da operadora. Tenta conectar na rede *5G* do seu roteador (ou cabo na TV) e tira o roteador da tomada por *30 segundos* pra renovar o DNS.",
+            "Me fala também: tá travando em todos os canais ou em um específico? E em qual aparelho você está usando?"
         ]
         return baloes, notificacao
 
-    if any(p in texto for p in ["canal", "canais", "fora do ar", "sem som", "mudo", "tela preta", "não abre", "nao abre", "0:00", "sumiu", "sinal"]):
-        notificacao = f"🛠️ *CHAMADO DE CANAL/SINAL (LUCAS):*\n👤 {nome} ({telefone})\n💬 Relato: {(mensagem or '')[:160]}"
-        registrar_evento_email(
-            "SUPORTE_TECNICO", nome, telefone, 0.0,
-            mensagem[:180],
-            "Orientação de desbloqueio de áudio/play (0:00), troca de canal para renovar sinal e alerta de grade enviado."
-        )
-        baloes = [
-            f"Opa{virgula_nome}, Lucas aqui! Já tô verificando a grade pra você.",
-            "Se a imagem abriu parada em 0:00 ou sem som, toca no botão de ativar o som no meio da tela que destrava na hora. Se foi só um canal que não entrou, muda pro canal vizinho e volta pra renovar o sinal.",
-            "Qual é o nome ou número exato do canal que deu isso aí? Já deixei o Jonas avisado aqui na bancada pra checar a rota dele!"
-        ]
-        return baloes, notificacao
-
-    if any(p in texto for p in ["samsung", "lg", "roku", "tv box", "box", "fire", "smart"]):
-        registrar_evento_email(
-            "SUPORTE_TECNICO", nome, telefone, 0.0,
-            mensagem[:180],
-            "Orientação de limpeza de cache da Smart TV / TV Box e reinício elétrico de 20 segundos."
-        )
-        baloes = [
-            "Em Smart TV e TV Box, quando pesa a memória do aparelho, o segredo é limpar o cache do navegador nas configurações da TV e desligar ela da tomada por uns 20 segundos.",
-            "Me diz a marca certinha do seu aparelho e o que apareceu na tela que te guio passo a passo!"
-        ]
-        return baloes, notificacao
-
-    if any(p in texto for p in ["pc", "computador", "notebook", "windows", "formatar", "pdv", "caixa", "impressora", "leitor"]):
+    # 4. Computador / Windows / PDV / Impressora
+    if any(p in texto_ascii for p in ["pc", "computador", "notebook", "windows", "formatar", "pdv", "caixa", "impressora", "leitor"]):
         registrar_evento_email(
             "SUPORTE_TECNICO", nome, telefone, 0.0,
             mensagem[:180],
             "Triagem técnica iniciada para Windows / Sistema PDV Caixa (impressora, leitor ou desempenho)."
         )
         baloes = [
-            f"Tranquilo{virgula_nome}, vamos organizar isso! Aqui é o Lucas.",
-            "Me conta só um detalhe pra eu separar a ferramenta certa: o problema é lentidão no Windows ou algum erro dentro do Sistema de Caixa (impressora, leitor ou banco)? Se aparecer mensagem na tela, pode mandar foto por aqui!"
+            f"Tranquilo{virgula_nome}, vamos organizar isso!",
+            "Me conta só um detalhe pra eu separar a solução certa: é lentidão no Windows/PC ou algum erro no Sistema PDV (impressora, leitor ou navegador)? Se aparecer erro na tela, pode mandar foto por aqui!"
         ]
         return baloes, notificacao
 
     registrar_evento_email(
         "SUPORTE_TECNICO", nome, telefone, 0.0,
         mensagem[:180],
-        "Atendimento técnico inicial aberto pelo Lucas aguardando detalhes/foto do cliente."
+        "Atendimento técnico do Lucas aguardando especificação do aparelho e sintoma."
     )
-    baloes = [
-        f"Fala{virgula_nome}! Tudo tranquilo? Aqui é o Lucas, cuido da parte técnica.",
-        "Me conta o que tá acontecendo aí: é algum canal oscilando, configuração na TV ou algo no computador? Pode me explicar do seu jeito ou mandar foto da tela que já vejo pra você!"
-    ]
+    if ja_atendeu_antes:
+        baloes = [
+            f"Entendi{virgula_nome}! Pra eu conseguir te passar o passo a passo exato sem te fazer perder tempo, me diz só esses 2 detalhes:",
+            "1️⃣ Qual aparelho você está usando agora (*celular, computador, Smart TV ou TV Box*)?\n2️⃣ O que aparece na tela (se preferir, manda uma foto por aqui)?"
+        ]
+    else:
+        baloes = [
+            f"Fala{virgula_nome}! Tudo tranquilo? Aqui é o Lucas, cuido da parte técnica.",
+            "Me conta o que tá acontecendo aí: é alguma configuração pra colocar na TV, canal que parou de funcionar ou algo no computador? Pode explicar do seu jeito ou mandar foto da tela!"
+        ]
     return baloes, notificacao
 
 
@@ -741,8 +771,16 @@ def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tip
 
     eh_intencao_humano = eh_opc_4 or texto_compacto == "jonas" or any(p in texto for p in ["falar com jonas", "falar com o jonas", "chama o jonas", "atendente humano", "falar com humano", "falar com dono"])
     eh_intencao_pdv_comercial = eh_opc_3 or any(p in texto for p in ["pdv", "sistema de caixa", "estoque", "150", "250", "350", "combo", "frota", "locadora", "mercadinho", "loja", "comercio", "comércio", "orçamento", "orcamento", "automação", "automacao", "robô", "robo"])
-    eh_intencao_suporte = eh_opc_2 or any(p in texto for p in ["suporte", "tecnico", "técnico", "defeito", "erro", "formatar", "pc lento", "computador lento", "travando", "engasgando", "oscilando", "tela preta", "sem som", "fora do ar", "canal caiu"])
+    eh_intencao_suporte = eh_opc_2 or any(p in texto for p in [
+        "suporte", "tecnico", "técnico", "defeito", "erro", "formatar", "pc lento", "computador lento",
+        "travando", "engasgando", "oscilando", "tela preta", "sem som", "fora do ar", "canal caiu",
+        "parou", "nao funciona", "não funciona", "nao pega", "não pega", "nao abre", "não abre",
+        "nao entra", "não entra", "nao carrega", "não carrega", "travou", "caiu", "sumiu", "sem sinal",
+        "colocar na tv", "coloca na tv", "botar na tv", "instalar na tv", "como coloca"
+    ])
     eh_intencao_tv = eh_opc_1 or any(p in texto for p in ["tv", "iptv", "cinepro", "canais", "radio", "rádio", "aberta"])
+
+    resposta_anterior_lead = (lead or {}).get("resposta", "")
 
     if eh_intencao_humano:
         setor_atual = "MENU_INICIAL"
@@ -772,7 +810,7 @@ def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tip
         elif eh_intencao_suporte or any(p in texto for p in ["pc", "computador", "notebook", "lento", "windows", "ajuda", "conserto"]):
             novo_setor = "SETOR_2_SUPORTE"
             atendente = "Lucas"
-            baloes, notif = diagnosticar_suporte_lucas(pnome, nome, telefone, mensagem, tipo_midia, texto_comprovante)
+            baloes, notif = diagnosticar_suporte_lucas(pnome, nome, telefone, mensagem, tipo_midia, texto_comprovante, resposta_anterior_lead)
             if notif:
                 dados_extras["notificacao_jonas"] = notif
         elif eh_intencao_tv or any(p in texto for p in ["teste", "testar", "futebol", "filme", "série", "serie", "jogo"]):
@@ -813,7 +851,7 @@ def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tip
     elif setor_atual == "SETOR_2_SUPORTE":
         atendente = "Lucas"
         novo_setor = "SETOR_2_SUPORTE"
-        baloes, notif = diagnosticar_suporte_lucas(pnome, nome, telefone, mensagem, tipo_midia, texto_comprovante)
+        baloes, notif = diagnosticar_suporte_lucas(pnome, nome, telefone, mensagem, tipo_midia, texto_comprovante, resposta_anterior_lead)
         if notif:
             dados_extras["notificacao_jonas"] = notif
 
