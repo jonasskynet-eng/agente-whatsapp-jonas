@@ -83,6 +83,8 @@ try:
     col_apolices = db["apolices_seguros"]
     col_chat_web = db["chat_web_historico"]
     auditoria_col = db["auditoria_agentes"]
+    col_custos_escala = db["custos_operacionais_ecossistema"]
+    col_metas_escala = db["plano_escala_metas"]
     print("[NUVEM] Conexão com MongoDB Atlas validada com sucesso!")
 except Exception as e:
     print(f"[ERRO MONGODB NUVEM] {e}")
@@ -93,6 +95,8 @@ except Exception as e:
     comprovantes_col = None
     eventos_email_col = None
     auditoria_col = None
+    col_custos_escala = None
+    col_metas_escala = None
     vendas_pdv_col = None
     col_vendas = None
     col_produtos = None
@@ -2240,6 +2244,291 @@ def api_auditor_executar():
     return jsonify(relatorio), 200
 
 
+# ==============================================================================
+# BANCO DE DADOS DE CUSTOS, PONTO DE EQUILÍBRIO & PLANO DE ESCALA (/escala)
+# ==============================================================================
+
+CUSTOS_PADRAO_ECOSSISTEMA = [
+    {
+        "codigo": "NET_FIXA",
+        "nome": "Internet Fixa",
+        "categoria": "Fixo Pessoal",
+        "tipo": "FIXO",
+        "valor_atual": 70.0,
+        "valor_escala": 70.0,
+        "fixo_sistema": True,
+        "observacao": "Informado por você (R$ 70,00/mês)"
+    },
+    {
+        "codigo": "CEL_MOVEL",
+        "nome": "Telefone Móvel (WhatsApp)",
+        "categoria": "Fixo Pessoal",
+        "tipo": "FIXO",
+        "valor_atual": 43.0,
+        "valor_escala": 43.0,
+        "fixo_sistema": True,
+        "observacao": "Uso direto no aparelho celular (R$ 43,00/mês)"
+    },
+    {
+        "codigo": "ANTIGRAVITY_PLUS",
+        "nome": "Assinatura Antigravity (Plus)",
+        "categoria": "Ferramentas IA",
+        "tipo": "FIXO",
+        "valor_atual": 100.0,
+        "valor_escala": 100.0,
+        "fixo_sistema": True,
+        "observacao": "Criação/manutenção (zero custo de IA por mensagem dos clientes)"
+    },
+    {
+        "codigo": "RENDER_WEB",
+        "nome": "Render Web Service",
+        "categoria": "Infraestrutura Nuvem",
+        "tipo": "FIXO",
+        "valor_atual": 0.0,
+        "valor_escala": 39.0,
+        "fixo_sistema": True,
+        "observacao": "Free hoje -> Starter US$ 7 (~R$ 39) sempre ligado + 8 threads"
+    },
+    {
+        "codigo": "CLOUDFLARE_PROXY",
+        "nome": "Cloudflare Workers Proxy",
+        "categoria": "Infraestrutura Nuvem",
+        "tipo": "FIXO",
+        "valor_atual": 0.0,
+        "valor_escala": 28.0,
+        "fixo_sistema": True,
+        "observacao": "Free 100k req/dia hoje -> Paid US$ 5 (~R$ 28) 10M req/mês"
+    },
+    {
+        "codigo": "MONGO_ATLAS",
+        "nome": "MongoDB Atlas (Banco de Dados)",
+        "categoria": "Infraestrutura Nuvem",
+        "tipo": "FIXO",
+        "valor_atual": 0.0,
+        "valor_escala": 56.0,
+        "fixo_sistema": True,
+        "observacao": "M0 Free 512MB hoje -> Flex a partir de US$ 8-10 (~R$ 56)"
+    },
+    {
+        "codigo": "VPS_WHATSAPP",
+        "nome": "VPS WhatsApp 24h Sem PC",
+        "categoria": "Infraestrutura Nuvem",
+        "tipo": "FIXO",
+        "valor_atual": 0.0,
+        "valor_escala": 50.0,
+        "fixo_sistema": True,
+        "observacao": "Opcional para deixar WhatsApp automático ligado sem PC"
+    },
+    {
+        "codigo": "LISTA_PAGA_VIP",
+        "nome": "Lista Paga VIP (Fornecedor por Cliente)",
+        "categoria": "Lista & Conteúdo",
+        "tipo": "VARIAVEL_CLIENTE",
+        "valor_atual": 0.0,
+        "valor_escala": 7.0,
+        "fixo_sistema": True,
+        "observacao": "Custo unitário mensal por cliente VIP pago (edite com seu valor real)"
+    },
+]
+
+METAS_ESCALA_PADRAO = [
+    {
+        "fase": 1,
+        "codigo": "FASE_1",
+        "titulo": "Fase 1 • Pagar Contas Fixas (Equilíbrio)",
+        "alvo_clientes": 9,
+        "nuvem_extra": 0.0,
+        "descricao": "Cobrir 100% dos R$ 213,00 atuais (Internet + Celular + Antigravity Plus)."
+    },
+    {
+        "fase": 2,
+        "codigo": "FASE_2",
+        "titulo": "Fase 2 • Caixa para Destravar Teto de 40",
+        "alvo_clientes": 40,
+        "nuvem_extra": 67.0,
+        "descricao": "Separar R$ 67/mês do próprio lucro para Render Starter + Cloudflare Paid e quebrar o limite de 40 pessoas."
+    },
+    {
+        "fase": 3,
+        "codigo": "FASE_3",
+        "titulo": "Fase 3 • Operação 24h Independente de PC",
+        "alvo_clientes": 150,
+        "nuvem_extra": 173.0,
+        "descricao": "Adicionar MongoDB Flex + VPS para WhatsApp automático 24h (receita bruta R$ 3.750/mês a ticket R$ 25)."
+    },
+    {
+        "fase": 4,
+        "codigo": "FASE_4",
+        "titulo": "Fase 4 • Escala Profissional (500+ Clientes)",
+        "alvo_clientes": 500,
+        "nuvem_extra": 394.0,
+        "descricao": "Render Standard 2GB RAM + Atlas Flex Teto + Workers + VPS (receita bruta R$ 12.500/mês)."
+    },
+]
+
+
+def _garantir_seeds_escala():
+    """Garante custos e metas iniciais no MongoDB Atlas sem sobrescrever edições do Jonas."""
+    if col_custos_escala is not None and col_custos_escala.count_documents({}) == 0:
+        agora_str = agora_brasilia().strftime("%Y-%m-%d %H:%M:%S")
+        col_custos_escala.insert_many([{**c, "atualizado_em": agora_str} for c in CUSTOS_PADRAO_ECOSSISTEMA])
+    if col_metas_escala is not None and col_metas_escala.count_documents({}) == 0:
+        col_metas_escala.insert_many([dict(m) for m in METAS_ESCALA_PADRAO])
+
+
+@app.route("/escala", methods=["GET"])
+def rota_painel_escala_custos():
+    """Serve o painel privado de Banco de Custos, Lucro Líquido e Plano de Escala."""
+    caminho = os.path.join(os.path.dirname(os.path.abspath(__file__)), "plano_escala.html")
+    if os.path.exists(caminho):
+        with open(caminho, "r", encoding="utf-8") as f:
+            return f.read(), 200, {"Content-Type": "text/html; charset=utf-8"}
+    return "Painel de Escala em atualização", 404
+
+
+@app.route("/api/escala/resumo", methods=["GET"])
+def api_escala_resumo():
+    """Retorna custos do MongoDB Atlas, assinantes ativos reais, ponto de equilíbrio e projeções de escala."""
+    try:
+        _garantir_seeds_escala()
+        ticket_medio = max(5.0, float(request.args.get("ticket", 25.0)))
+        custos = (
+            list(col_custos_escala.find({}, {"_id": 0}))
+            if col_custos_escala is not None
+            else list(CUSTOS_PADRAO_ECOSSISTEMA)
+        )
+        metas = (
+            list(col_metas_escala.find({}, {"_id": 0}).sort("fase", 1))
+            if col_metas_escala is not None
+            else list(METAS_ESCALA_PADRAO)
+        )
+
+        fixos = [c for c in custos if c.get("tipo") == "FIXO"]
+        variaveis = [c for c in custos if c.get("tipo") != "FIXO"]
+        custo_fixo_atual = round(sum(float(c.get("valor_atual") or 0.0) for c in fixos), 2)
+        custo_fixo_escala = round(sum(float(c.get("valor_escala") or 0.0) for c in fixos), 2)
+        custo_var_atual = round(sum(float(c.get("valor_atual") or 0.0) for c in variaveis), 2)
+        custo_var_escala = round(sum(float(c.get("valor_escala") or 0.0) for c in variaveis), 2)
+
+        agora_ms = int(datetime.utcnow().timestamp() * 1000)
+        assinantes_ativos = 0
+        testes_2h_ativos = 0
+        if assinantes_col is not None:
+            for doc in assinantes_col.find({"status": "ATIVO"}, {"_id": 0, "expira_ts": 1, "tipo_plano": 1}):
+                exp = int(doc.get("expira_ts") or 0)
+                if not exp or exp > agora_ms:
+                    if doc.get("tipo_plano") == "TESTE_2H":
+                        testes_2h_ativos += 1
+                    else:
+                        assinantes_ativos += 1
+
+        receita_pagamentos_mes = 0.0
+        mes_prefixo = agora_brasilia().strftime("%Y-%m")
+        if eventos_email_col is not None:
+            for ev in eventos_email_col.find({"tipo": "PAGAMENTO"}, {"_id": 0, "valor": 1, "data_dia": 1}):
+                if str(ev.get("data_dia") or "").startswith(mes_prefixo):
+                    receita_pagamentos_mes += float(ev.get("valor") or 0.0)
+
+        margem_unitaria = max(1.0, round(ticket_medio - custo_var_atual, 2))
+        ponto_eq_clientes = math.ceil(custo_fixo_atual / margem_unitaria) if custo_fixo_atual > 0 else 0
+        ponto_eq_receita = round(ponto_eq_clientes * ticket_medio, 2)
+
+        receita_recorrente_est = round(assinantes_ativos * ticket_medio, 2)
+        lucro_estimado_atual = round(receita_recorrente_est - custo_fixo_atual - (assinantes_ativos * custo_var_atual), 2)
+
+        cenarios = []
+        for qtd in [9, 40, 100, 150, 250, 500, 1000]:
+            nuvem_ref = 0.0 if qtd <= 40 else (67.0 if qtd <= 120 else (173.0 if qtd <= 250 else 394.0))
+            base_fixa_ref = 213.0 + nuvem_ref
+            bruto = round(qtd * ticket_medio, 2)
+            lucro_propria = round(bruto - base_fixa_ref, 2)
+            lucro_lista_paga = round(bruto - base_fixa_ref - (qtd * (custo_var_escala or 7.0)), 2)
+            cenarios.append({
+                "clientes": qtd,
+                "nuvem_estimada": nuvem_ref,
+                "custo_fixo_total": base_fixa_ref,
+                "receita_bruta": bruto,
+                "lucro_lista_propria": lucro_propria,
+                "lucro_lista_paga": lucro_lista_paga,
+            })
+
+        return jsonify({
+            "atualizado_em": agora_brasilia().strftime("%d/%m/%Y %H:%M:%S"),
+            "ticket_medio": ticket_medio,
+            "custo_fixo_atual": custo_fixo_atual,
+            "custo_fixo_escala": custo_fixo_escala,
+            "custo_var_atual": custo_var_atual,
+            "custo_var_escala": custo_var_escala,
+            "margem_unitaria": margem_unitaria,
+            "ponto_equilibrio_clientes": ponto_eq_clientes,
+            "ponto_equilibrio_receita": ponto_eq_receita,
+            "assinantes_ativos": assinantes_ativos,
+            "testes_2h_ativos": testes_2h_ativos,
+            "receita_pagamentos_mes": round(receita_pagamentos_mes, 2),
+            "receita_recorrente_est": receita_recorrente_est,
+            "lucro_estimado_atual": lucro_estimado_atual,
+            "custos": custos,
+            "metas": metas,
+            "cenarios": cenarios,
+        }), 200
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
+
+@app.route("/api/escala/custo", methods=["POST", "OPTIONS"])
+def api_escala_salvar_custo():
+    """Cria ou atualiza um custo operacional no banco MongoDB Atlas."""
+    if request.method == "OPTIONS":
+        return jsonify({"status": "ok"}), 200
+    try:
+        if col_custos_escala is None:
+            return jsonify({"erro": "Banco de dados indisponível."}), 503
+        dados = request.get_json(silent=True) or {}
+        nome = str(dados.get("nome") or "").strip()[:80]
+        if not nome:
+            return jsonify({"erro": "Nome do custo é obrigatório."}), 400
+        codigo = re.sub(r"[^A-Z0-9_]", "_", str(dados.get("codigo") or nome).strip().upper())[:32]
+        tipo = "VARIAVEL_CLIENTE" if dados.get("tipo") == "VARIAVEL_CLIENTE" else "FIXO"
+        valor_atual = max(0.0, float(dados.get("valor_atual") or 0.0))
+        valor_escala = max(0.0, float(dados.get("valor_escala") if dados.get("valor_escala") is not None else valor_atual))
+        doc_atual = col_custos_escala.find_one({"codigo": codigo}) or {}
+        doc = {
+            "codigo": codigo,
+            "nome": nome,
+            "categoria": str(dados.get("categoria") or doc_atual.get("categoria") or "Operacional").strip()[:40],
+            "tipo": tipo,
+            "valor_atual": round(valor_atual, 2),
+            "valor_escala": round(valor_escala, 2),
+            "fixo_sistema": bool(doc_atual.get("fixo_sistema", False)),
+            "observacao": str(dados.get("observacao") or doc_atual.get("observacao") or "").strip()[:140],
+            "atualizado_em": agora_brasilia().strftime("%Y-%m-%d %H:%M:%S")
+        }
+        col_custos_escala.update_one({"codigo": codigo}, {"$set": doc}, upsert=True)
+        return jsonify({"sucesso": True, "custo": doc}), 200
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
+
+@app.route("/api/escala/custo/<codigo>", methods=["DELETE", "OPTIONS"])
+def api_escala_remover_custo(codigo):
+    """Remove um item de custo customizado do banco MongoDB Atlas."""
+    if request.method == "OPTIONS":
+        return jsonify({"status": "ok"}), 200
+    try:
+        if col_custos_escala is None:
+            return jsonify({"erro": "Banco de dados indisponível."}), 503
+        cod = re.sub(r"[^A-Z0-9_]", "_", str(codigo or "").upper())
+        existente = col_custos_escala.find_one({"codigo": cod})
+        if not existente:
+            return jsonify({"erro": "Custo não encontrado."}), 404
+        if existente.get("fixo_sistema"):
+            return jsonify({"erro": "Custos base do ecossistema não são excluídos — ajuste o valor para 0,00."}), 400
+        col_custos_escala.delete_one({"codigo": cod})
+        return jsonify({"sucesso": True}), 200
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
+
 @app.route("/api/financeiro/metricas", methods=["GET"])
 def api_financeiro_metricas():
     """Calcula investimento em estoque, custos fixos, faturamento e Ponto de Equilíbrio."""
@@ -3335,9 +3624,11 @@ def inicializar_seeds_erp():
     except Exception as e:
         print(f"[ERRO AO INICIALIZAR SEEDS ERP] {e}")
 
-# Executa seed de inicialização
+
+# Executa seed de inicialização ERP e Banco de Custos/Escala
 try:
     inicializar_seeds_erp()
+    _garantir_seeds_escala()
 except Exception:
     pass
 

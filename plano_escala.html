@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Banco de Custos, Lucro &amp; Plano de Escala • Central TV &amp; Rádios</title>
+  <style>
+    :root {
+      --fundo: #090d16;
+      --cartao: #111827;
+      --borda: #1f2937;
+      --texto: #f3f4f6;
+      --suave: #9ca3af;
+      --verde: #10b981;
+      --amarelo: #f59e0b;
+      --azul: #38bdf8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Roboto, Arial, sans-serif;
+      background: var(--fundo);
+      color: var(--texto);
+      line-height: 1.5;
+      padding: 20px 16px 44px;
+    }
+    .container { max-width: 1140px; margin: 0 auto; }
+    header {
+      display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center;
+      padding-bottom: 16px; border-bottom: 1px solid var(--borda); margin-bottom: 20px;
+    }
+    h1 { font-size: 1.35rem; font-weight: 700; }
+    .sub { color: var(--suave); font-size: 0.9rem; margin-top: 2px; }
+    .acoes { display: flex; flex-wrap: wrap; gap: 8px; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 10px;
+      border: 1px solid var(--borda); background: #172033; color: var(--texto); text-decoration: none;
+      font-size: 0.86rem; font-weight: 600; cursor: pointer;
+      transition: background-color 0.18s ease, border-color 0.18s ease;
+    }
+    .btn:hover { background: #1e293b; border-color: var(--azul); }
+    .btn-verde { background: #065f46; border-color: var(--verde); color: #ecfdf5; }
+    .btn-verde:hover { background: #047857; }
+    .btn-mini { padding: 5px 10px; font-size: 0.78rem; border-radius: 8px; }
+    .grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 20px; }
+    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 16px; margin-bottom: 20px; }
+    .card { background: var(--cartao); border: 1px solid var(--borda); border-radius: 14px; padding: 16px; }
+    .card-titulo { font-size: 0.84rem; color: var(--suave); font-weight: 600; }
+    .card-valor { font-size: 1.5rem; font-weight: 800; margin-top: 4px; }
+    .card-detalhe { font-size: 0.82rem; color: var(--suave); margin-top: 6px; }
+    h2 { font-size: 1.05rem; margin-bottom: 12px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+    th, td { text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--borda); vertical-align: middle; }
+    th { color: var(--suave); font-weight: 600; }
+    input, select {
+      background: #0b1220; border: 1px solid #2b3648; color: var(--texto);
+      border-radius: 8px; padding: 7px 10px; font-size: 0.86rem;
+    }
+    .inp-num { width: 92px; text-align: right; }
+    .fase-box {
+      padding: 12px; border-radius: 10px; border: 1px solid var(--borda);
+      background: #0d1424; margin-bottom: 10px;
+    }
+    .barra-bg { height: 8px; border-radius: 999px; background: #1f2937; overflow: hidden; margin-top: 8px; }
+    .barra-fill { height: 100%; background: var(--verde); border-radius: 999px; }
+    .sim-row { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; align-items: flex-end; }
+    .campo { display: flex; flex-direction: column; gap: 4px; font-size: 0.8rem; color: var(--suave); }
+    .destaque-sim {
+      padding: 12px 14px; border-radius: 12px; background: rgba(16,185,129,0.12);
+      border: 1px solid rgba(16,185,129,0.4); display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <h1>💰 Banco de Custos, Lucro &amp; Plano de Escala</h1>
+        <div class="sub">Dados persistidos ao vivo no MongoDB Atlas para sair dos 40 clientes e escalar com lucro</div>
+      </div>
+      <div class="acoes">
+        <a href="/auditor" class="btn">🛡️ Quadro do Auditor</a>
+        <a href="/tv" class="btn">📺 Player TV &amp; Rádios</a>
+        <a href="/atendimento" class="btn">💬 Chat Online</a>
+      </div>
+    </header>
+
+    <div class="grid-4">
+      <div class="card">
+        <div class="card-titulo">📉 Custo Fixo Atual (Banco)</div>
+        <div class="card-valor" id="valFixoAtual" style="color:#f59e0b;">-</div>
+        <div class="card-detalhe" id="detFixoEscala">Na escala: -</div>
+      </div>
+      <div class="card">
+        <div class="card-titulo">⚖️ Ponto de Equilíbrio</div>
+        <div class="card-valor" id="valEquilibrio" style="color:#38bdf8;">-</div>
+        <div class="card-detalhe" id="detEquilibrio">Clientes a ticket médio R$ 25,00</div>
+      </div>
+      <div class="card">
+        <div class="card-titulo">👥 Assinantes Ativos (Atlas)</div>
+        <div class="card-valor" id="valAtivos" style="color:#10b981;">-</div>
+        <div class="card-detalhe" id="detTestes">Testes 2h ativos: -</div>
+      </div>
+      <div class="card">
+        <div class="card-titulo">💵 Pagamentos Validados no Mês</div>
+        <div class="card-valor" id="valPagMes">-</div>
+        <div class="card-detalhe" id="detLucroAtual">Recorrente est.: -</div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <h2>🎛️ Simulador de Crescimento &amp; Lista Paga</h2>
+        <div class="sim-row">
+          <div class="campo">
+            <label for="simClientes">Clientes Ativos</label>
+            <input type="number" id="simClientes" value="150" min="1" max="5000" oninput="recalcularSimulador()">
+          </div>
+          <div class="campo">
+            <label for="simTicket">Ticket Médio (R$)</label>
+            <input type="number" id="simTicket" value="25" min="10" max="100" step="1" oninput="recalcularSimulador()">
+          </div>
+          <div class="campo">
+            <label for="simVarCliente">Lista Paga / Cliente (R$)</label>
+            <input type="number" id="simVarCliente" value="0" min="0" max="30" step="0.5" oninput="recalcularSimulador()">
+          </div>
+          <div class="campo">
+            <label for="simNuvem">Infraestrutura Nuvem</label>
+            <select id="simNuvem" onchange="recalcularSimulador()">
+              <option value="0">Atual Grátis (até ~40) — R$ 0</option>
+              <option value="67">Starter + Workers Paid (até 150) — R$ 67</option>
+              <option value="173" selected>Completa Sem PC + VPS (até 300) — R$ 173</option>
+              <option value="394">Profissional 500+ Clientes — R$ 394</option>
+            </select>
+          </div>
+        </div>
+        <div class="destaque-sim" id="boxSimResultado">Calculando...</div>
+
+        <h2 style="margin-top:18px;">🚀 Escada de Crescimento (4 Fases)</h2>
+        <div id="boxMetas">Carregando fases...</div>
+      </div>
+
+      <div class="card">
+        <h2>📊 Projeção Automática por Quantidade de Clientes</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Clientes</th>
+              <th>Bruto</th>
+              <th>Nuvem Est.</th>
+              <th>Lucro *(Lista Própria)*</th>
+              <th>Lucro *(Lista Paga)*</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyCenarios"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>🗄️ Banco de Custos Operacionais (MongoDB Atlas — Editável)</h2>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th>Categoria</th>
+              <th>Tipo</th>
+              <th>Atual Hoje (R$)</th>
+              <th>Meta Escala (R$)</th>
+              <th>Ação</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyCustos"></tbody>
+        </table>
+      </div>
+
+      <h3 style="font-size:0.95rem; margin:16px 0 8px; color:var(--suave);">➕ Cadastrar Novo Custo no Banco</h3>
+      <div class="sim-row">
+        <div class="campo"><label for="novoNome">Descrição</label><input type="text" id="novoNome" placeholder="Ex: Reserva Imposto MEI"></div>
+        <div class="campo"><label for="novaCat">Categoria</label><input type="text" id="novaCat" value="Operacional"></div>
+        <div class="campo">
+          <label for="novoTipo">Tipo</label>
+          <select id="novoTipo">
+            <option value="FIXO">Fixo Mensal</option>
+            <option value="VARIAVEL_CLIENTE">Por Cliente Ativo</option>
+          </select>
+        </div>
+        <div class="campo"><label for="novoValAtual">Atual (R$)</label><input type="number" id="novoValAtual" class="inp-num" value="0" min="0" step="1"></div>
+        <div class="campo"><label for="novoValEscala">Escala (R$)</label><input type="number" id="novoValEscala" class="inp-num" value="0" min="0" step="1"></div>
+        <button type="button" class="btn btn-verde" onclick="adicionarCusto()">Salvar no MongoDB</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let DADOS_ATUAIS = null;
+    function fmt(v) {
+      return 'R$ ' + Number(v || 0).toFixed(2).replace('.', ',');
+    }
+    function esc(t) {
+      return String(t || '').replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
+    }
+
+    function recalcularSimulador() {
+      const clientes = Math.max(1, Number(document.getElementById('simClientes').value || 0));
+      const ticket = Math.max(5, Number(document.getElementById('simTicket').value || 25));
+      const varCli = Math.max(0, Number(document.getElementById('simVarCliente').value || 0));
+      const nuvem = Math.max(0, Number(document.getElementById('simNuvem').value || 0));
+      const basePessoal = DADOS_ATUAIS
+        ? DADOS_ATUAIS.custos.filter(c => c.tipo === 'FIXO' && c.categoria !== 'Infraestrutura Nuvem').reduce((s, c) => s + Number(c.valor_atual || 0), 0)
+        : 213;
+      const fixoTotal = basePessoal + nuvem;
+      const receita = clientes * ticket;
+      const custoVar = clientes * varCli;
+      const lucro = receita - fixoTotal - custoVar;
+      const margem = Math.max(1, ticket - varCli);
+      const eq = Math.ceil(fixoTotal / margem);
+      document.getElementById('boxSimResultado').innerHTML = `
+        <div><div class="card-titulo">Receita Bruta</div><strong>${fmt(receita)}/mês</strong></div>
+        <div><div class="card-titulo">Fixo Total + Lista</div><strong>${fmt(fixoTotal + custoVar)}/mês</strong></div>
+        <div><div class="card-titulo">Equilíbrio</div><strong>${eq} clientes</strong></div>
+        <div><div class="card-titulo">Lucro Líquido</div><strong style="color:${lucro >= 0 ? '#10b981' : '#ef4444'}; font-size:1.15rem;">${fmt(lucro)}/mês</strong></div>
+      `;
+    }
+
+    async function carregarResumo() {
+      const res = await fetch('/api/escala/resumo');
+      const d = await res.json();
+      DADOS_ATUAIS = d;
+
+      document.getElementById('valFixoAtual').textContent = fmt(d.custo_fixo_atual) + '/mês';
+      document.getElementById('detFixoEscala').textContent = `Com todos upgrades: ${fmt(d.custo_fixo_escala)}/mês`;
+      document.getElementById('valEquilibrio').textContent = `${d.ponto_equilibrio_clientes} clientes`;
+      document.getElementById('detEquilibrio').textContent = `${fmt(d.ponto_equilibrio_receita)}/mês (ticket ${fmt(d.ticket_medio)})`;
+      document.getElementById('valAtivos').textContent = String(d.assinantes_ativos || 0);
+      document.getElementById('detTestes').textContent = `Testes 2h ativos agora: ${d.testes_2h_ativos || 0}`;
+      document.getElementById('valPagMes').textContent = fmt(d.receita_pagamentos_mes);
+      document.getElementById('detLucroAtual').textContent = `Recorrente ativos est.: ${fmt(d.receita_recorrente_est)}`;
+
+      const ativos = Number(d.assinantes_ativos || 0);
+      document.getElementById('boxMetas').innerHTML = (d.metas || []).map(m => {
+        const pct = Math.min(100, Math.round((ativos / Math.max(1, m.alvo_clientes)) * 100));
+        return `
+          <div class="fase-box">
+            <div style="display:flex; justify-content:space-between; font-weight:700; font-size:0.9rem;">
+              <span>${esc(m.titulo)}</span>
+              <span>${ativos}/${m.alvo_clientes} (${pct}%)</span>
+            </div>
+            <div class="card-detalhe">${esc(m.descricao)}</div>
+            <div class="barra-bg"><div class="barra-fill" style="width:${pct}%"></div></div>
+          </div>
+        `;
+      }).join('');
+
+      document.getElementById('tbodyCenarios').innerHTML = (d.cenarios || []).map(c => `
+        <tr>
+          <td><strong>${c.clientes}</strong></td>
+          <td>${fmt(c.receita_bruta)}</td>
+          <td>${fmt(c.nuvem_estimada)}</td>
+          <td style="color:#10b981; font-weight:700;">${fmt(c.lucro_lista_propria)}</td>
+          <td style="color:#38bdf8;">${fmt(c.lucro_lista_paga)}</td>
+        </tr>
+      `).join('');
+
+      document.getElementById('tbodyCustos').innerHTML = (d.custos || []).map(c => `
+        <tr>
+          <td><strong>${esc(c.nome)}</strong><div class="card-detalhe">${esc(c.observacao)}</div></td>
+          <td>${esc(c.categoria)}</td>
+          <td>${c.tipo === 'VARIAVEL_CLIENTE' ? 'Por Cliente' : 'Fixo Mensal'}</td>
+          <td><input type="number" class="inp-num" id="va_${esc(c.codigo)}" value="${Number(c.valor_atual || 0).toFixed(2)}" min="0" step="0.5"></td>
+          <td><input type="number" class="inp-num" id="ve_${esc(c.codigo)}" value="${Number(c.valor_escala || 0).toFixed(2)}" min="0" step="0.5"></td>
+          <td>
+            <button type="button" class="btn btn-verde btn-mini" onclick="atualizarCusto('${esc(c.codigo)}', '${esc(c.nome)}', '${esc(c.categoria)}', '${esc(c.tipo)}')">Salvar</button>
+            ${c.fixo_sistema ? '' : `<button type="button" class="btn btn-mini" onclick="excluirCusto('${esc(c.codigo)}')">Excluir</button>`}
+          </td>
+        </tr>
+      `).join('');
+
+      recalcularSimulador();
+    }
+
+    async function atualizarCusto(codigo, nome, categoria, tipo) {
+      const va = Number(document.getElementById('va_' + codigo).value || 0);
+      const ve = Number(document.getElementById('ve_' + codigo).value || 0);
+      await fetch('/api/escala/custo', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ codigo, nome, categoria, tipo, valor_atual: va, valor_escala: ve })
+      });
+      await carregarResumo();
+    }
+
+    async function adicionarCusto() {
+      const nome = document.getElementById('novoNome').value.trim();
+      if (!nome) return;
+      await fetch('/api/escala/custo', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          nome,
+          categoria: document.getElementById('novaCat').value.trim() || 'Operacional',
+          tipo: document.getElementById('novoTipo').value,
+          valor_atual: Number(document.getElementById('novoValAtual').value || 0),
+          valor_escala: Number(document.getElementById('novoValEscala').value || 0)
+        })
+      });
+      document.getElementById('novoNome').value = '';
+      await carregarResumo();
+    }
+
+    async function excluirCusto(codigo) {
+      await fetch('/api/escala/custo/' + encodeURIComponent(codigo), { method: 'DELETE' });
+      await carregarResumo();
+    }
+
+    carregarResumo();
+  </script>
+</body>
+</html>
