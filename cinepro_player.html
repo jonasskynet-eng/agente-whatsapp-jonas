@@ -503,11 +503,16 @@ header{background:linear-gradient(180deg,rgba(0,0,0,0.96) 0%,rgba(20,20,20,0.92)
                 <h3>📱 Controle Remoto no Celular</h3>
                 <button class="modal-dismiss" id="remoteModalDismiss">&times;</button>
             </div>
-            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
-                Aponte a câmera do seu celular para o QR Code abaixo para controlar a TV pelo Wi-Fi:
+            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 10px;">
+                Aponte a câmera do celular para o QR Code abaixo e controle tudo sem usar o controle da TV:
             </p>
-            <div id="qrcodeBox" style="background: #fff; padding: 14px; border-radius: 14px; display: inline-block; box-shadow: 0 10px 30px rgba(0,0,0,0.5); margin-bottom: 16px;">
-                <div id="qrcodeContainer"></div>
+            <div style="display:inline-block; background:rgba(16,185,129,0.14); border:1px solid rgba(16,185,129,0.45); color:#6ee7b7; padding:6px 14px; border-radius:20px; font-family:monospace; font-size:15px; font-weight:900; margin-bottom:12px;">
+                Código da TV: <span id="remoteCodigoBadge">------</span>
+            </div>
+            <div>
+                <div id="qrcodeBox" style="background: #fff; padding: 14px; border-radius: 14px; display: inline-block; box-shadow: 0 10px 30px rgba(0,0,0,0.5); margin-bottom: 14px;">
+                    <div id="qrcodeContainer"></div>
+                </div>
             </div>
             <div style="background: var(--bg-card); border: 1px solid var(--border); padding: 10px 14px; border-radius: 10px; margin-bottom: 14px; font-family: monospace; font-size: 13px; color: #6ee7b7; word-break: break-all;" id="remoteUrlDisplay">
                 Carregando link...
@@ -1591,11 +1596,22 @@ header{background:linear-gradient(180deg,rgba(0,0,0,0.96) 0%,rgba(20,20,20,0.92)
 
             mostrarHUD(`⚡ Sintonizando CH #${c.numero_str}: ${c.nome}`);
 
-            // Notificar status atual e EPG apenas quando rodando conectado ao servidor local
+            const epgAtualStr = `${epg.faixa} • ${epg.titulo}`;
+            const epgProxStr = `A seguir (${epg.proximaFaixa.split(' - ')[0]}): ${epg.proximoTitulo}`;
             if (EH_AMBIENTE_LOCAL) {
-                const epgAtualStr = `${epg.faixa} • ${epg.titulo}`;
-                const epgProxStr = `A seguir (${epg.proximaFaixa.split(' - ')[0]}): ${epg.proximoTitulo}`;
                 fetch(`/api/status_tv?canal_numero=${c.numero}&canal_nome=${encodeURIComponent(c.nome)}&epg_atual=${encodeURIComponent(epgAtualStr)}&epg_proximo=${encodeURIComponent(epgProxStr)}`).catch(() => {});
+            } else if (typeof CODIGO_CONTROLE_TV !== 'undefined' && CODIGO_CONTROLE_TV) {
+                fetch('/api/controle/status', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        tv: CODIGO_CONTROLE_TV,
+                        canal_numero: c.numero,
+                        canal_nome: c.nome,
+                        epg_atual: epgAtualStr,
+                        epg_proximo: epgProxStr
+                    })
+                }).catch(() => {});
             }
 
             if (mpegtsPlayer) {
@@ -2536,10 +2552,41 @@ header{background:linear-gradient(180deg,rgba(0,0,0,0.96) 0%,rgba(20,20,20,0.92)
             if (e.target === modalShade) modalShade.classList.remove('open');
         });
 
-        // MODAL DO CONTROLE REMOTO POR CELULAR COM QR CODE
+        // MODAL DO CONTROLE REMOTO POR CELULAR COM QR CODE (LOCAL E NUVEM)
         const remoteModal = document.getElementById('remoteModal');
         const btnQrRemote = document.getElementById('btnQrRemote');
         let qrCodeInstancia = null;
+        let controlePareadoNuvem = false;
+        let ultimoEnvioStatusTV = 0;
+
+        function obterCodigoControleTV() {
+            let cod = '';
+            try { cod = (sessionStorage.getItem('cinepro_tv_code') || '').trim().toUpperCase(); } catch (_) {}
+            if (!cod) {
+                cod = String(Math.floor(100000 + Math.random() * 900000));
+                try { sessionStorage.setItem('cinepro_tv_code', cod); } catch (_) {}
+            }
+            return cod;
+        }
+        const CODIGO_CONTROLE_TV = obterCodigoControleTV();
+
+        function enviarStatusAtualParaControle() {
+            if (EH_AMBIENTE_LOCAL || !TODOS_CANAIS.length) return;
+            const c = TODOS_CANAIS[canalAtualIndex] || TODOS_CANAIS[0];
+            if (!c) return;
+            const epg = obterEpgDinamico(c);
+            fetch('/api/controle/status', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    tv: CODIGO_CONTROLE_TV,
+                    canal_numero: c.numero,
+                    canal_nome: c.nome,
+                    epg_atual: `${epg.faixa} • ${epg.titulo}`,
+                    epg_proximo: `A seguir (${epg.proximaFaixa.split(' - ')[0]}): ${epg.proximoTitulo}`
+                })
+            }).catch(() => {});
+        }
 
         function carregarLibQrCode() {
             if (window.QRCode) return Promise.resolve();
@@ -2554,6 +2601,9 @@ header{background:linear-gradient(180deg,rgba(0,0,0,0.96) 0%,rgba(20,20,20,0.92)
 
         btnQrRemote.addEventListener('click', async () => {
             remoteModal.classList.add('open');
+            const badgeCod = document.getElementById('remoteCodigoBadge');
+            if (badgeCod) badgeCod.textContent = CODIGO_CONTROLE_TV;
+            if (!EH_AMBIENTE_LOCAL) enviarStatusAtualParaControle();
             if (!qrCodeInstancia) {
                 const container = document.getElementById('qrcodeContainer');
                 if (container) container.innerHTML = '<span style="font-size:12px;color:#64748b;">Gerando QR Code...</span>';
@@ -2581,9 +2631,12 @@ header{background:linear-gradient(180deg,rgba(0,0,0,0.96) 0%,rgba(20,20,20,0.92)
                     const data = await resp.json();
                     renderizarQr(data.url_controle);
                 } catch (err) {
+                    const baseOrigin = window.location.protocol.startsWith('http')
+                        ? window.location.origin
+                        : 'https://agente-whatsapp-jonas.onrender.com';
                     const fallbackUrl = EH_AMBIENTE_LOCAL
                         ? `http://${window.location.hostname || '192.168.100.210'}:8080/controle.html`
-                        : window.location.href.split('#')[0].split('?')[0];
+                        : `${baseOrigin}/controle?tv=${encodeURIComponent(CODIGO_CONTROLE_TV)}`;
                     renderizarQr(fallbackUrl);
                 }
             }
@@ -2603,22 +2656,45 @@ header{background:linear-gradient(180deg,rgba(0,0,0,0.96) 0%,rgba(20,20,20,0.92)
             });
         });
 
-        // ESCUTADOR EM TEMPO REAL DE COMANDOS DO CELULAR (SOMENTE EM AMBIENTE LOCAL)
+        // ESCUTADOR EM TEMPO REAL DE COMANDOS DO CELULAR (PC LOCAL E SMART TV NA NUVEM)
         async function ouvirComandosRemotos() {
-            if (!EH_AMBIENTE_LOCAL) return;
+            if (document.hidden) return;
             try {
-                const resp = await fetch('/api/ouvir_comandos');
+                if (EH_AMBIENTE_LOCAL) {
+                    const resp = await fetch('/api/ouvir_comandos');
+                    if (resp.ok) {
+                        const cmds = await resp.json();
+                        for (const item of cmds) {
+                            executarComandoRemoto(item.cmd, item.val);
+                        }
+                    }
+                    return;
+                }
+                const resp = await fetch(`/api/controle/ouvir?tv=${encodeURIComponent(CODIGO_CONTROLE_TV)}`);
                 if (resp.ok) {
-                    const cmds = await resp.json();
+                    const data = await resp.json();
+                    const cmds = Array.isArray(data.comandos) ? data.comandos : [];
+                    if (data.pareado && !controlePareadoNuvem) {
+                        controlePareadoNuvem = true;
+                        enviarStatusAtualParaControle();
+                    }
+                    if (cmds.length > 0 && remoteModal.classList.contains('open')) {
+                        remoteModal.classList.remove('open');
+                        mostrarHUD('📱 Controle no celular conectado à TV!');
+                    }
                     for (const item of cmds) {
                         executarComandoRemoto(item.cmd, item.val);
                     }
                 }
             } catch (err) {}
         }
-        if (EH_AMBIENTE_LOCAL) {
-            setInterval(ouvirComandosRemotos, 350);
-        }
+        (function agendarLoopControleRemoto() {
+            const intervalo = EH_AMBIENTE_LOCAL ? 350 : ((remoteModal.classList.contains('open') || controlePareadoNuvem) ? 900 : 2500);
+            setTimeout(async () => {
+                await ouvirComandosRemotos();
+                agendarLoopControleRemoto();
+            }, intervalo);
+        })();
 
         function executarComandoRemoto(cmd, val) {
             switch (cmd) {
@@ -2668,10 +2744,44 @@ header{background:linear-gradient(180deg,rgba(0,0,0,0.96) 0%,rgba(20,20,20,0.92)
                     }
                     break;
                 case 'categoria':
-                    catFiltro = val || 'all';
-                    const selCatRem = document.getElementById('selectCatFiltro');
-                    if (selCatRem) selCatRem.value = catFiltro;
-                    aplicarFiltros(true);
+                    {
+                        const catVal = val || 'all';
+                        const pillAlvo = document.querySelector(`.q-pill[data-cat="${catVal}"]`);
+                        if (typeof selecionarCategoriaDireta === 'function' && pillAlvo) {
+                            selecionarCategoriaDireta(catVal, pillAlvo);
+                        } else {
+                            catFiltro = catVal;
+                            const selCatRem = document.getElementById('selectCatFiltro');
+                            if (selCatRem) selCatRem.value = catFiltro;
+                            aplicarFiltros(true);
+                        }
+                        mostrarHUD(`📂 Categoria: ${catVal.toUpperCase()}`);
+                    }
+                    break;
+                case 'login_vip':
+                    {
+                        const rawVip = String(val || '').trim();
+                        if (!rawVip) break;
+                        const partes = rawVip.split('|');
+                        const uVip = (partes[0] || '').trim().toLowerCase();
+                        const sVip = (partes[1] || '').trim();
+                        if (uVip && sVip && typeof window.autenticarCredenciaisCinePro === 'function') {
+                            window.autenticarCredenciaisCinePro(uVip, sVip).then(() => {
+                                mostrarHUD('👑 Lista VIP liberada na TV pelo celular!');
+                            }).catch(() => {
+                                mostrarHUD('❌ Usuário ou senha VIP inválidos');
+                            });
+                        } else if (uVip && typeof window.carregarCanaisExtrasVip === 'function') {
+                            window.carregarCanaisExtrasVip(uVip).then(ok => {
+                                if (ok) {
+                                    try { localStorage.setItem('cinepro_vip_key', uVip); } catch (_) {}
+                                    mostrarHUD('👑 Lista VIP liberada na TV pelo celular!');
+                                } else {
+                                    mostrarHUD('❌ Código VIP inválido');
+                                }
+                            });
+                        }
+                    }
                     break;
                 case 'voltar':
                     voltarCanalAnterior();
@@ -3642,6 +3752,7 @@ header{background:linear-gradient(180deg,rgba(0,0,0,0.96) 0%,rgba(20,20,20,0.92)
           }
           return data;
         }
+        window.autenticarCredenciaisCinePro = autenticarCredenciais;
 
         window.fazerLoginAssinante = async function(idUser, idPass, idErro, idBtn) {
           const u = (document.getElementById(idUser)?.value || '').trim();

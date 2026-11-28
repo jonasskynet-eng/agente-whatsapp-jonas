@@ -2200,6 +2200,105 @@ def api_canais_vip_cinepro():
     return jsonify({"ok": True, "canais": canais_vip}), 200
 
 
+# ==============================================================================
+# CONTROLE REMOTO DA TV VIA QR CODE NA NUVEM (/controle + /api/controle/*)
+# ==============================================================================
+_CONTROLE_TV_LOCK = threading.Lock()
+_CONTROLE_TV_SALAS = {}
+
+
+def _normalizar_codigo_tv(raw: str) -> str:
+    return re.sub(r"[^A-Z0-9_-]", "", (raw or "").strip().upper())[:24]
+
+
+def _limpar_salas_antigas():
+    agora = time.time()
+    expiradas = [k for k, v in _CONTROLE_TV_SALAS.items() if agora - float(v.get("atualizado_em") or 0) > 7200]
+    for k in expiradas:
+        _CONTROLE_TV_SALAS.pop(k, None)
+
+
+@app.route("/controle", methods=["GET"])
+@app.route("/controle.html", methods=["GET"])
+def rota_controle_remoto_tv():
+    """Serve o controle remoto mobile acionado pelo QR Code da TV."""
+    caminho = os.path.join(os.path.dirname(os.path.abspath(__file__)), "controle.html")
+    if os.path.exists(caminho):
+        with open(caminho, "r", encoding="utf-8") as f:
+            return f.read(), 200, {"Content-Type": "text/html; charset=utf-8"}
+    return "Controle remoto em atualização", 404
+
+
+@app.route("/api/controle/enviar", methods=["POST", "GET"])
+def api_controle_enviar_nuvem():
+    """Recebe comandos do celular e entrega em tempo real para a TV pareada."""
+    dados = request.get_json(silent=True) or {}
+    codigo = _normalizar_codigo_tv(dados.get("tv") or request.args.get("tv") or "")
+    cmd = str(dados.get("cmd") or request.args.get("cmd") or "").strip()[:40]
+    val = dados.get("val") if "val" in dados else request.args.get("val", "")
+    if not codigo or not cmd:
+        return jsonify({"ok": False, "erro": "Informe o código da TV e o comando."}), 400
+    agora = time.time()
+    with _CONTROLE_TV_LOCK:
+        _limpar_salas_antigas()
+        sala = _CONTROLE_TV_SALAS.setdefault(codigo, {"cmds": [], "status": {}, "atualizado_em": agora, "pareado_em": 0.0})
+        sala["cmds"].append({"cmd": cmd, "val": "" if val is None else str(val)[:160], "ts": agora})
+        if len(sala["cmds"]) > 30:
+            sala["cmds"] = sala["cmds"][-30:]
+        sala["pareado_em"] = agora
+        sala["atualizado_em"] = agora
+    return jsonify({"ok": True, "tv": codigo, "cmd": cmd}), 200
+
+
+@app.route("/api/controle/ouvir", methods=["GET"])
+def api_controle_ouvir_nuvem():
+    """Retorna e consome os comandos enviados pelo celular para a TV informada."""
+    codigo = _normalizar_codigo_tv(request.args.get("tv") or "")
+    if not codigo:
+        return jsonify({"ok": False, "comandos": [], "pareado": False}), 400
+    agora = time.time()
+    with _CONTROLE_TV_LOCK:
+        _limpar_salas_antigas()
+        sala = _CONTROLE_TV_SALAS.setdefault(codigo, {"cmds": [], "status": {}, "atualizado_em": agora, "pareado_em": 0.0})
+        cmds = list(sala.get("cmds") or [])
+        sala["cmds"] = []
+        sala["atualizado_em"] = agora
+        pareado = (agora - float(sala.get("pareado_em") or 0)) < 900
+    return jsonify({"ok": True, "comandos": cmds, "pareado": pareado}), 200
+
+
+@app.route("/api/controle/status", methods=["GET", "POST"])
+def api_controle_status_nuvem():
+    """Sincroniza qual canal está passando na TV para mostrar no controle do celular."""
+    if request.method == "POST":
+        dados = request.get_json(silent=True) or {}
+        codigo = _normalizar_codigo_tv(dados.get("tv") or "")
+        if not codigo:
+            return jsonify({"ok": False}), 400
+        agora = time.time()
+        with _CONTROLE_TV_LOCK:
+            sala = _CONTROLE_TV_SALAS.setdefault(codigo, {"cmds": [], "status": {}, "atualizado_em": agora, "pareado_em": 0.0})
+            sala["status"] = {
+                "canal_numero": dados.get("canal_numero") or "",
+                "canal_nome": str(dados.get("canal_nome") or "")[:90],
+                "epg_atual": str(dados.get("epg_atual") or "")[:120],
+                "epg_proximo": str(dados.get("epg_proximo") or "")[:120],
+            }
+            sala["atualizado_em"] = agora
+        return jsonify({"ok": True}), 200
+
+    codigo = _normalizar_codigo_tv(request.args.get("tv") or "")
+    if not codigo:
+        return jsonify({"ok": False, "canal_nome": "Aguardando código da TV..."}), 400
+    with _CONTROLE_TV_LOCK:
+        sala = _CONTROLE_TV_SALAS.get(codigo) or {}
+        st = dict(sala.get("status") or {})
+        st["ok"] = True
+        st["tv"] = codigo
+        st["pareado"] = bool(sala.get("pareado_em"))
+    return jsonify(st), 200
+
+
 @app.route("/auditor", methods=["GET"])
 def rota_painel_auditor_ao_vivo():
     """Serve o Quadro ao Vivo do Auditor dos 3 Agentes + Latência & Conexão."""
