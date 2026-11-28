@@ -1193,7 +1193,7 @@ header{background:linear-gradient(180deg,rgba(0,0,0,0.96) 0%,rgba(20,20,20,0.92)
         let DEFAULT_CLOUDFLARE_PROXY_URL = 'https://cinepro-tv-proxy.jonasskynet.workers.dev';
         let LOCAL_PROXY_ATIVO = false;
         let NUVEM_PROXY_ATIVO = false;
-        let NUVEM_PROXY_ENDPOINT = '/.netlify/functions/proxy?url=';
+        let NUVEM_PROXY_ENDPOINT = 'https://cinepro-tv-proxy.jonasskynet.workers.dev/?url=';
         let SERVIDOR_DOCKER_VIP = false;
         let REQUER_CHAVE_VIP = false;
         let VIP_DESBLOQUEADO = false;
@@ -1323,18 +1323,6 @@ header{background:linear-gradient(180deg,rgba(0,0,0,0.96) 0%,rgba(20,20,20,0.92)
             const ponteCustom = obterUrlPonteConfigurada();
             if (ponteCustom) {
                 testarEAtivarPonteNuvem(ponteCustom);
-            }
-            if (window.location.protocol === 'https:') {
-                fetch('/.netlify/functions/proxy')
-                    .then(r => r.text().then(txt => ({ status: r.status, txt })))
-                    .then(({ status, txt }) => {
-                        if (!NUVEM_PROXY_ATIVO && (status === 400 || txt.includes('Missing url parameter'))) {
-                            NUVEM_PROXY_ATIVO = true;
-                            NUVEM_PROXY_ENDPOINT = '/.netlify/functions/proxy?url=';
-                            aplicarFiltros(true);
-                        }
-                    })
-                    .catch(() => {});
             }
             fetch('http://localhost:8080/api/ip_local', { mode: 'cors' })
                 .then(r => {
