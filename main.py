@@ -861,20 +861,20 @@ def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tip
         or "Lucas" in resposta_anterior_lead
     )
 
+    eh_compra_explicita = eh_opc_3 or any(p in texto_sem_acento for p in [
+        "comprar", "preco", "valor", "quanto custa", "orcamento", "pix", "combo", "150", "250", "350", "assinar", "fechar"
+    ])
+
     if eh_intencao_humano:
         setor_atual = "MENU_INICIAL"
     elif setor_atual == "SETOR_1_CINEPRO" and (eh_intencao_suporte or eh_intencao_pdv_comercial):
         setor_atual = "MENU_INICIAL"
-    elif (
-        setor_atual == "SETOR_2_SUPORTE"
-        and eh_intencao_tv
-        and not eh_intencao_pdv_comercial
-        and not eh_intencao_suporte
-        and not any(p in texto_sem_acento for p in ["samsung", "lg", "roku", "tcl", "philco", "aoc", "tv box", "smart", "chromecast", "android tv"])
-    ):
-        setor_atual = "MENU_INICIAL"
-    elif setor_atual == "SETOR_3_COMERCIAL" and eh_pedido_explicito_canais_tv and not eh_intencao_pdv_comercial:
-        setor_atual = "MENU_INICIAL"
+    elif setor_atual == "SETOR_2_SUPORTE":
+        if eh_compra_explicita or (eh_pedido_explicito_canais_tv and not eh_intencao_suporte):
+            setor_atual = "MENU_INICIAL"
+    elif setor_atual == "SETOR_3_COMERCIAL":
+        if (eh_intencao_suporte and not eh_compra_explicita) or (eh_pedido_explicito_canais_tv and not eh_intencao_pdv_comercial and not eh_compra_explicita):
+            setor_atual = "MENU_INICIAL"
 
     # 5. ROTEAMENTO CONVERSACIONAL RESOLUTIVO
     if setor_atual == "MENU_INICIAL":
@@ -887,6 +887,12 @@ def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tip
                 f"Pode deixar{virgula_nome}! Já dei um toque no celular pessoal do Jonas pra ele assumir nossa conversa aqui.",
                 "Se quiser, já pode ir mandando sua dúvida por escrito que assim que ele pegar no aparelho já te responde direto, combinado?"
             ]
+        elif eh_intencao_suporte and not eh_compra_explicita:
+            novo_setor = "SETOR_2_SUPORTE"
+            atendente = "Lucas"
+            baloes, notif = diagnosticar_suporte_lucas(pnome, nome, telefone, mensagem, tipo_midia, texto_comprovante, resposta_anterior_lead, lucas_ja_atendeu)
+            if notif:
+                dados_extras["notificacao_jonas"] = notif
         elif eh_intencao_pdv_comercial or any(p in texto_sem_acento for p in ["venda", "comercial", "comprar", "preco", "sistema", "caixa", "quanto custa", "valor", "tabela", "servicos", "sistemas"]):
             novo_setor = "SETOR_3_COMERCIAL"
             atendente = "Marcos"
@@ -894,7 +900,7 @@ def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tip
                 f"Opa{virgula_nome}! Tudo bem? Aqui é o Marcos, trabalho na parte comercial junto com o Jonas.",
                 "Me conta rapidinho o que você tá buscando melhorar hoje pra eu te indicar o caminho certo: é nosso Sistema PDV + Estoque + Ponto de Equilíbrio & Frotas na Nuvem (R$ 150 implantação), Otimização de computador ou Atendimento Online 24h?"
             ]
-        elif eh_intencao_suporte or any(p in texto_sem_acento for p in ["pc", "computador", "notebook", "lento", "windows", "ajuda", "conserto"]):
+        elif any(p in texto_sem_acento for p in ["pc", "computador", "notebook", "lento", "windows", "ajuda", "conserto"]):
             novo_setor = "SETOR_2_SUPORTE"
             atendente = "Lucas"
             baloes, notif = diagnosticar_suporte_lucas(pnome, nome, telefone, mensagem, tipo_midia, texto_comprovante, resposta_anterior_lead, lucas_ja_atendeu)
