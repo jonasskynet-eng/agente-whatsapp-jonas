@@ -128,6 +128,16 @@ def normalizar_ascii(texto):
     return "".join(c for c in nfkd if not unicodedata.combining(c))
 
 
+def normalizar_giria_whatsapp(texto):
+    """Normaliza abreviações e erros comuns de digitação no WhatsApp mantendo ASCII minúsculo."""
+    base = normalizar_ascii((texto or "").strip().lower())
+    return re.sub(
+        r"\b(?:no|n|num|naum)\s+(pega|funciona|abre|entra|carrega|vai|da|tem|conecta|baixa|instala|consegue|consigo|aparece|roda|aceita)\b",
+        r"nao \1",
+        base,
+    )
+
+
 def obter_status_robo():
     """Retorna True se o robô estiver ligado e False se estiver pausado pelo Jonas."""
     if config_col is not None:
@@ -379,7 +389,7 @@ def diagnosticar_suporte_lucas(pnome, nome, telefone, mensagem, tipo_midia, text
     """Retorna (baloes, notificacao_jonas) para o Lucas resolver problemas reais com anti-loop."""
     virgula_nome = f", {pnome}" if pnome else ""
     texto = (mensagem or "").strip().lower()
-    texto_ascii = normalizar_ascii(texto)
+    texto_ascii = normalizar_giria_whatsapp(texto)
     notificacao = None
     ja_atendeu_antes = bool(ja_atendeu_antes or ("Lucas" in (resposta_anterior or "")))
 
@@ -484,6 +494,47 @@ def diagnosticar_suporte_lucas(pnome, nome, telefone, mensagem, tipo_midia, text
                 f"Certo{virgula_nome}! Quando para em *todos os canais* ao mesmo tempo, normalmente é conexão DNS/Wi-Fi ou bloqueio do navegador da TV.",
                 "Confere se o site abre normal no navegador do celular no Wi-Fi. Se no celular abrir e na TV não, me manda uma foto da tela da TV aqui que resolvo com você!"
             ]
+        return baloes, notificacao
+
+    # 4.5. TV sem internet / sem Wi-Fi / modelo comum antigo
+    if any(p in texto_ascii for p in [
+        "nao conecta", "sem internet", "sem wifi", "sem wi-fi",
+        "tv comum", "sem smart", "nao tem internet", "nao tem wifi", "nao tem wi-fi", "modelo antigo"
+    ]):
+        registrar_evento_email(
+            "SUPORTE_TECNICO", nome, telefone, 0.0,
+            mensagem[:180],
+            "Orientação enviada para TV comum sem internet (HDMI, TV Box ou uso direto no celular)."
+        )
+        baloes = [
+            f"Tranquilo{virgula_nome}! Quando a TV é modelo comum sem internet, você tem 3 saídas fáceis:",
+            (
+                f"1️⃣ *Direto no celular:* você pode assistir todos os 200 canais grátis no navegador do seu aparelho pelo link:\n{LINK_PLAYER_IPTV}\n"
+                "2️⃣ *Cabo HDMI no notebook/PC:* ligue o cabo HDMI na TV e abra esse mesmo link na tela cheia.\n"
+                "3️⃣ *TV Box ou Chromecast:* transforma qualquer TV comum com entrada HDMI em Smart TV pelo Wi-Fi."
+            ),
+            "Se você tiver notebook ou TV Box aí com você, me avisa qual deles pretende usar que te guio!"
+        ]
+        return baloes, notificacao
+
+    # 4.6. TV não pega IPTV / não instala aplicativo / sem navegador
+    if any(p in texto_ascii for p in [
+        "nao pega iptv", "nao roda iptv", "nao aceita iptv", "nao pega aplicativo",
+        "nao baixa", "nao instala", "nao tem navegador", "sem navegador", "tv antiga", "nao tem aplicativo"
+    ]):
+        registrar_evento_email(
+            "SUPORTE_TECNICO", nome, telefone, 0.0,
+            mensagem[:180],
+            "Orientação para TV que não instala app IPTV (acesso via navegador direto ou espelhamento)."
+        )
+        baloes = [
+            f"Entendi perfeitamente{virgula_nome}! Se a sua TV não instala aplicativo de IPTV, dá para assistir sem baixar app nenhum:",
+            (
+                f"1️⃣ *Pelo navegador da própria TV (se tiver Wi-Fi):* abra o app *Internet / Browser* da televisão e entre direto nesse link:\n{LINK_PLAYER_IPTV}\n\n"
+                "2️⃣ *Se a TV não tiver navegador:* abra o link no celular e toque em *Transmitir / Espelhar Tela* (ou use um *TV Box / cabo HDMI* ligado no computador)."
+            ),
+            "A sua TV chega a conectar no Wi-Fi ou ela é modelo antigo sem internet?"
+        ]
         return baloes, notificacao
 
     # 5. TV ou canal parou de funcionar / travou / não abre / sem sinal
@@ -834,7 +885,7 @@ def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tip
     eh_opc_3 = opc_limpa in ["3", "opcao 3", "opção 3"]
     eh_opc_4 = opc_limpa in ["4", "opcao 4", "opção 4"]
 
-    texto_sem_acento = normalizar_ascii(texto)
+    texto_sem_acento = normalizar_giria_whatsapp(texto)
     eh_chamar_lucas = opc_limpa == "lucas" or any(p in texto_sem_acento for p in [
         "falar com lucas", "falar com o lucas", "chama o lucas", "chamar lucas",
         "passa pro lucas", "quero falar com lucas", "quero o lucas"
@@ -858,13 +909,15 @@ def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tip
         "suporte", "tecnico", "defeito", "erro", "formatar", "pc lento", "computador lento",
         "travando", "engasgando", "oscilando", "tela preta", "sem som", "fora do ar", "canal caiu",
         "parou", "nao funciona", "nao pega", "nao abre", "nao entra", "nao carrega",
+        "nao baixa", "nao instala", "nao conecta", "nao consigo", "nao tem navegador", "sem navegador",
+        "tv antiga", "tv comum", "modelo antigo", "sem internet", "sem wifi", "sem wi-fi",
         "travou", "caiu", "sumiu", "sem sinal", "colocar na tv", "coloca na tv", "botar na tv",
         "instalar na tv", "como coloca", "todos os canais", "um canal", "um so"
     ])
     eh_intencao_tv = eh_opc_1 or eh_chamar_camila or any(p in texto_sem_acento for p in ["tv", "iptv", "cinepro", "canais", "radio", "aberta"])
     eh_pedido_explicito_canais_tv = eh_opc_1 or eh_chamar_camila or any(p in texto_sem_acento for p in [
         "canais", "tv aberta", "central gratuita", "central de tv", "cinepro",
-        "iptv", "radio", "quero testar a tv", "link da tv", "quero abrir a central"
+        "radio", "quero testar a tv", "link da tv", "quero abrir a central"
     ])
 
     resposta_anterior_lead = (lead or {}).get("resposta", "")
