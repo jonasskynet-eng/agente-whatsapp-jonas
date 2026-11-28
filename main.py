@@ -2142,6 +2142,17 @@ def rota_cinepro_player_nuvem():
     return "Player CinePro em atualização", 404
 
 
+@app.route("/tv.html", methods=["GET"])
+@app.route("/tv-samsung", methods=["GET"])
+def rota_cinepro_tv_samsung_leve():
+    """Serve o Modo Smart TV Leve (ES5 puro) compatível com TVs Samsung e TV Box antigas."""
+    caminho = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tv.html")
+    if os.path.exists(caminho):
+        with open(caminho, "r", encoding="utf-8") as f:
+            return f.read(), 200, {"Content-Type": "text/html; charset=utf-8"}
+    return "Modo Smart TV Leve em atualização", 404
+
+
 def _carregar_canais_vip_nuvem():
     """Carrega lista VIP opcional (canais_vip.json ou VIP_M3U_URL) mantendo apenas canais reais configurados."""
     pasta = os.path.dirname(os.path.abspath(__file__))
