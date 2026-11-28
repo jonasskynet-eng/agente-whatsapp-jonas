@@ -47,11 +47,43 @@ try:
     db = client["sistema_comercial_db"]
     leads_col = db["leads_whatsapp"]
     alertas_col = db["alertas_urgentes_jonas"]
+    config_col = db["configuracoes_gerais"]
     print("[NUVEM] Conexão com MongoDB Atlas validada com sucesso!")
 except Exception as e:
     print(f"[ERRO MONGODB NUVEM] {e}")
     leads_col = None
     alertas_col = None
+    config_col = None
+
+def obter_status_robo():
+    """Retorna True se o robô estiver ligado e False se estiver pausado pelo Jonas."""
+    if config_col is not None:
+        try:
+            doc = config_col.find_one({"chave": "status_robo"})
+            if doc:
+                return bool(doc.get("ativo", True))
+        except Exception as e:
+            print(f"[ERRO STATUS ROBO]: {e}")
+    return True
+
+def definir_status_robo(ativo: bool):
+    """Grava na nuvem se o robô está ligado ou pausado."""
+    if config_col is not None:
+        try:
+            config_col.update_one(
+                {"chave": "status_robo"},
+                {"$set": {
+                    "chave": "status_robo",
+                    "ativo": ativo,
+                    "atualizado_em": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                }},
+                upsert=True
+            )
+            print(f"[STATUS ROBO] Estado alterado para: {'LIGADO' if ativo else 'PAUSADO'}")
+            return True
+        except Exception as e:
+            print(f"[ERRO ATUALIZAR STATUS]: {e}")
+    return False
 
 def obter_menu_principal(nome_cliente):
     return (
@@ -82,7 +114,24 @@ def disparar_alerta_cliente_quente(telefone, nome, motivo, valor=None):
 
 def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tipo_midia="text"):
     texto = mensagem.strip().lower()
+    dados_extras = {}
     
+    # 0. COMANDO MESTRE DO JONAS PARA LIGAR OU DESLIGAR O ROBÔ POR MENSAGEM
+    tel_limpo = "".join(c for c in str(telefone) if c.isdigit())
+    eh_jonas = tel_limpo.endswith("966707293") or "jonas" in nome.lower()
+    
+    if eh_jonas and texto in ["desligar", "pausar", "dormir", "parar", "#desligar", "#pausar"]:
+        definir_status_robo(False)
+        return "ROBO_PAUSADO", "Sistema de Controle Jonas Tech", "🔴 *ROBÔ PAUSADO COM SUCESSO!*\n\nA Central de Atendimento foi desligada. Nenhuma mensagem de cliente será respondida automaticamente até você mandar *LIGAR*.", {"robo_ativo": False}
+        
+    if eh_jonas and texto in ["ligar", "ativar", "acordar", "#ligar", "#ativar"]:
+        definir_status_robo(True)
+        return "ROBO_ATIVADO", "Sistema de Controle Jonas Tech", "🟢 *ROBÔ ATIVADO COM SUCESSO!*\n\nA Central Multissetorial voltou a operar 24 horas por dia normalmente.", {"robo_ativo": True}
+
+    # SE O ROBÔ ESTIVER DESLIGADO, ELE FICA EM SILÊNCIO TOTAL
+    if not obter_status_robo():
+        return "ROBO_PAUSADO", "Robô em Silêncio", "", {"robo_ativo": False, "ignorado": True}
+
     # 1. Recuperar histórico do lead no MongoDB Atlas
     lead = None
     if leads_col is not None:
@@ -301,6 +350,26 @@ def webhook_whatsapp():
         "resposta_pronta": resposta,
         "dados_extras": extras
     }), 200
+
+@app.route("/api/robo/status", methods=["GET"])
+def api_robo_status():
+    return jsonify({"ativo": obter_status_robo()}), 200
+
+@app.route("/api/robo/alternar", methods=["POST", "GET"])
+def api_robo_alternar():
+    novo = not obter_status_robo()
+    definir_status_robo(novo)
+    return jsonify({"ativo": novo, "status": "LIGADO" if novo else "PAUSADO"}), 200
+
+@app.route("/api/robo/ligar", methods=["POST", "GET"])
+def api_robo_ligar():
+    definir_status_robo(True)
+    return jsonify({"ativo": True, "status": "LIGADO"}), 200
+
+@app.route("/api/robo/desligar", methods=["POST", "GET"])
+def api_robo_desligar():
+    definir_status_robo(False)
+    return jsonify({"ativo": False, "status": "PAUSADO"}), 200
 
 if __name__ == "__main__":
     porta = int(os.environ.get("PORT", 8080))
