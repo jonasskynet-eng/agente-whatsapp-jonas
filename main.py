@@ -375,13 +375,13 @@ def obter_recepcao_natural(pnome):
     return [abertura, corpo]
 
 
-def diagnosticar_suporte_lucas(pnome, nome, telefone, mensagem, tipo_midia, texto_comprovante, resposta_anterior=""):
+def diagnosticar_suporte_lucas(pnome, nome, telefone, mensagem, tipo_midia, texto_comprovante, resposta_anterior="", ja_atendeu_antes=False):
     """Retorna (baloes, notificacao_jonas) para o Lucas resolver problemas reais com anti-loop."""
     virgula_nome = f", {pnome}" if pnome else ""
     texto = (mensagem or "").strip().lower()
     texto_ascii = normalizar_ascii(texto)
     notificacao = None
-    ja_atendeu_antes = "Lucas" in (resposta_anterior or "")
+    ja_atendeu_antes = bool(ja_atendeu_antes or ("Lucas" in (resposta_anterior or "")))
 
     if tipo_midia in ["image", "document"]:
         texto_tela = (texto_comprovante or mensagem or "").strip()
@@ -781,12 +781,23 @@ def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tip
     eh_intencao_tv = eh_opc_1 or any(p in texto for p in ["tv", "iptv", "cinepro", "canais", "radio", "rádio", "aberta"])
 
     resposta_anterior_lead = (lead or {}).get("resposta", "")
+    lucas_ja_atendeu = (
+        setor_atual == "SETOR_2_SUPORTE"
+        or (lead or {}).get("atendente_responsavel") == "Lucas"
+        or "Lucas" in resposta_anterior_lead
+    )
 
     if eh_intencao_humano:
         setor_atual = "MENU_INICIAL"
     elif setor_atual == "SETOR_1_CINEPRO" and (eh_intencao_suporte or eh_intencao_pdv_comercial):
         setor_atual = "MENU_INICIAL"
-    elif setor_atual in ["SETOR_2_SUPORTE", "SETOR_3_COMERCIAL"] and eh_intencao_tv and not eh_intencao_pdv_comercial and not eh_intencao_suporte:
+    elif (
+        setor_atual in ["SETOR_2_SUPORTE", "SETOR_3_COMERCIAL"]
+        and eh_intencao_tv
+        and not eh_intencao_pdv_comercial
+        and not eh_intencao_suporte
+        and not any(p in texto for p in ["samsung", "lg", "roku", "tcl", "philco", "aoc", "tv box", "smart", "chromecast", "android tv"])
+    ):
         setor_atual = "MENU_INICIAL"
 
     # 5. ROTEAMENTO CONVERSACIONAL RESOLUTIVO
@@ -810,7 +821,7 @@ def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tip
         elif eh_intencao_suporte or any(p in texto for p in ["pc", "computador", "notebook", "lento", "windows", "ajuda", "conserto"]):
             novo_setor = "SETOR_2_SUPORTE"
             atendente = "Lucas"
-            baloes, notif = diagnosticar_suporte_lucas(pnome, nome, telefone, mensagem, tipo_midia, texto_comprovante, resposta_anterior_lead)
+            baloes, notif = diagnosticar_suporte_lucas(pnome, nome, telefone, mensagem, tipo_midia, texto_comprovante, resposta_anterior_lead, lucas_ja_atendeu)
             if notif:
                 dados_extras["notificacao_jonas"] = notif
         elif eh_intencao_tv or any(p in texto for p in ["teste", "testar", "futebol", "filme", "série", "serie", "jogo"]):
@@ -851,7 +862,7 @@ def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tip
     elif setor_atual == "SETOR_2_SUPORTE":
         atendente = "Lucas"
         novo_setor = "SETOR_2_SUPORTE"
-        baloes, notif = diagnosticar_suporte_lucas(pnome, nome, telefone, mensagem, tipo_midia, texto_comprovante, resposta_anterior_lead)
+        baloes, notif = diagnosticar_suporte_lucas(pnome, nome, telefone, mensagem, tipo_midia, texto_comprovante, resposta_anterior_lead, True)
         if notif:
             dados_extras["notificacao_jonas"] = notif
 
