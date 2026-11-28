@@ -370,7 +370,7 @@ def obter_recepcao_natural(pnome):
     ])
     corpo = (
         "Aqui é da equipe do Jonas! Me conta, como posso te ajudar hoje? "
-        "Você tá procurando o teste grátis da TV, nosso sistema de caixa e estoque ou precisa de ajuda técnica pro computador?"
+        "Você quer conhecer nosso Sistema PDV & Frotas na nuvem, precisa de suporte técnico para computador ou quer abrir nossa Central gratuita de TV Aberta e Rádios?"
     )
     return [abertura, corpo]
 
@@ -474,14 +474,14 @@ def gerar_resposta_fallback_inteligente(setor, pnome, mensagem_usuario):
     if any(k in texto_limpo for k in ["roku", "fire stick", "firestick", "smart", "samsung", "lg", "tcl", "celular", "iphone", "computador", "notebook", "tv box", "box", "aparelho"]):
         if setor == "SETOR_1_CINEPRO":
             return [
-                f"Funciona sim com excelente qualidade{virgula_nome}! 📺",
-                "O CinePro roda perfeitamente em Smart TVs (Samsung, LG, TCL, Android TV), TV Box, Fire Stick, celular e computador através de um aplicativo super leve.",
-                "Quer que eu te mande o teste grátis de 2 horas agora pra você ver funcionando aí na sua tela?"
+                f"Funciona direto pelo navegador{virgula_nome}! 📺",
+                "Nossa Central CinePro TV reúne 200 canais públicos e gratuitos (TV aberta do Brasil, Notícias e Rádios) para abrir no celular, computador ou Smart TV, sem precisar instalar aplicativo nem prometer canais fechados pagos.",
+                f"Se quiser abrir agora gratuitamente, é só acessar: {LINK_PLAYER_IPTV}"
             ]
         else:
             return [
-                f"Com certeza{virgula_nome}! Todos os nossos sistemas são otimizados pra rodar super leves sem travar a sua máquina.",
-                "Você prefere conhecer o sistema PDV pra comércio ou os nossos planos de canais e filmes na TV?"
+                f"Com certeza{virgula_nome}! Todos os nossos sistemas rodam 100% na nuvem direto pelo navegador, super leves no celular, tablet ou computador.",
+                "Você prefere conhecer o Sistema PDV & Frotas para comércio (a partir de R$ 150) ou abrir nossa Central gratuita de TV Aberta e Rádios?"
             ]
 
     # Dúvidas de Pagamento / Cartão / Parcelamento
@@ -495,34 +495,34 @@ def gerar_resposta_fallback_inteligente(setor, pnome, mensagem_usuario):
     if any(k in texto_limpo for k in ["sem internet", "caiu a net", "offline", "precisa de net"]):
         if setor == "SETOR_3_COMERCIAL":
             return [
-                f"Essa é uma das maiores vantagens do nosso PDV{virgula_nome}:",
-                "Ele roda direto no seu computador local! Se a internet cair, o seu caixa continua vendendo e registrando o estoque normalmente sem parar a sua loja. Quando a rede volta, ele sincroniza tudo.",
-                "Quer que eu te mande a chave PIX de R$ 150 pra já liberar a sua licença vitalícia?"
+                f"Essa é uma das maiores vantagens do nosso PDV em Nuvem{virgula_nome}:",
+                "Como ele roda 100% na nuvem pelo navegador, você acessa do computador, tablet ou celular sem depender de uma única máquina — e todos os seus produtos, caixa e clientes ficam salvos em segurança no MongoDB Atlas.",
+                "Quer que eu te mande a chave PIX de R$ 150 pra já implantar no seu negócio?"
             ]
 
     # Cumprimentos e gírias informais
     if any(k in texto_limpo for k in ["salve", "tranquilo", "beleza", "e ai", "fala ai", "opa tudo bem", "opa"]):
         return [
             f"Opa{virgula_nome}, tudo tranquilo por aqui e com você? 🚀",
-            "Como posso te ajudar hoje? Temos o teste grátis da CinePro TV por 2 horas e também os nossos sistemas comerciais para comércio e suporte técnico!"
+            "Como posso te ajudar hoje? Temos nosso Sistema PDV & Frotas na nuvem, Suporte Técnico e nossa Central gratuita com 200 canais de TV Aberta, Notícias e Rádios!"
         ]
 
     # Fallback contextual por setor
     if setor == "SETOR_1_CINEPRO":
         return [
-            f"Entendi perfeitamente o que você precisa{virgula_nome}! 😊",
-            "Aqui no CinePro TV você tem mais de 4.000 canais abertos e fechados, além de todos os lançamentos de filmes e séries por apenas R$ 30 mensais, sem fidelidade.",
-            "Posso já gerar o seu teste de 2 horas pra você experimentar sem pagar nada?"
+            f"Entendi perfeitamente{virgula_nome}! 😊",
+            "Nossa Central CinePro TV oferece gratuitamente 200 canais abertos selecionados (TV Aberta nacional e regional, Rádios ao vivo e Notícias) direto no navegador — sem pacotes fechados pagos nem cobrança de mensalidade.",
+            f"Pode abrir grátis agora por aqui: {LINK_PLAYER_IPTV}"
         ]
     elif setor == "SETOR_2_SUPORTE":
         return [
             f"Compreendi o seu relato{virgula_nome}. Sou o Lucas do suporte técnico especializado.",
-            "Para eu te orientar com precisão: o problema está acontecendo na conexão de rede (Wi-Fi), em algum canal específico ou no aplicativo da sua TV?"
+            "Para eu te orientar com precisão: o problema está acontecendo na conexão de rede (Wi-Fi), em algum canal aberto ou no computador / sistema da sua loja?"
         ]
     elif setor == "SETOR_3_COMERCIAL":
         return [
             f"Perfeito{virgula_nome}! Sou o Marcos do comercial da Jonas Tech.",
-            "Nós desenvolvemos o Sistema PDV Frente de Caixa (pagamento único de R$ 150, sem mensalidades) e o Combo de Modernização completo.",
+            "Nós implantamos o Sistema PDV Frente de Caixa + Ponto de Equilíbrio + CRM + Frotas 100% na Nuvem (R$ 150 taxa de implantação), Chat de Atendimento 24h (R$ 250) e o Combo Modernização completo (R$ 350).",
             "Me conta um pouco do seu comércio ou da sua ideia pra eu te indicar a melhor opção!"
         ]
 
@@ -746,23 +746,21 @@ def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tip
             baloes, notif = diagnosticar_suporte_lucas(pnome, nome, telefone, mensagem, tipo_midia, texto_comprovante)
             if notif:
                 dados_extras["notificacao_jonas"] = notif
-        elif any(p in texto for p in ["1", "tv", "iptv", "cinepro", "teste", "testar", "futebol", "canais", "filme", "série", "serie", "jogo", "pacote vip"]):
+        elif any(p in texto for p in ["1", "tv", "iptv", "cinepro", "teste", "testar", "futebol", "canais", "filme", "série", "serie", "jogo", "pacote vip", "radio", "rádio"]):
             novo_setor = "SETOR_1_CINEPRO"
             atendente = "Camila"
             agora = agora_brasilia()
             dados_extras["teste_iniciado_em"] = agora.strftime("%Y-%m-%d %H:%M:%S")
-            dados_extras["horario_regua_15min"] = (agora + timedelta(minutes=15)).strftime("%Y-%m-%d %H:%M:%S")
-            dados_extras["horario_regua_expira"] = (agora + timedelta(hours=2)).strftime("%Y-%m-%d %H:%M:%S")
             baloes = [
-                f"Oi{virgula_nome}! Tudo bom? Aqui é a Camila 😊 Já deixei liberado seu teste grátis de 2 horas pra você ver a qualidade!",
-                f"É só tocar nesse link aqui pra abrir:\n{LINK_PLAYER_IPTV}\n\nPega direto no celular, computador ou Smart TV, com filmes novos e jogos ao vivo. Abre aí rapidinho e me conta se rodou lisinho!"
+                f"Oi{virgula_nome}! Tudo bom? Aqui é a Camila 😊 Separei o link direto da nossa Central de TV Aberta, Notícias e Rádios Online com 200 canais gratuitos:",
+                f"É só tocar nesse link aqui pra abrir direto no navegador (celular, computador ou Smart TV):\n{LINK_PLAYER_IPTV}\n\nSão canais abertos públicos e rádios selecionados para rodar bem leve e sem travar (não inclui pacotes pagos fechados). Abre aí e me conta se gostou!"
             ]
-        elif any(p in texto for p in ["3", "venda", "comercial", "comprar", "preco", "preço", "sistema", "pdv", "caixa", "estoque", "150", "quanto custa", "valor", "tabela", "robô", "robo", "mercadinho", "loja", "comercio", "comércio", "orçamento", "orcamento", "serviços", "servicos", "sistemas"]):
+        elif any(p in texto for p in ["3", "venda", "comercial", "comprar", "preco", "preço", "sistema", "pdv", "caixa", "estoque", "150", "quanto custa", "valor", "tabela", "robô", "robo", "mercadinho", "loja", "comercio", "comércio", "orçamento", "orcamento", "serviços", "servicos", "sistemas", "frota", "locadora"]):
             novo_setor = "SETOR_3_COMERCIAL"
             atendente = "Marcos"
             baloes = [
                 f"Opa{virgula_nome}! Tudo bem? Aqui é o Marcos, trabalho na parte comercial junto com o Jonas.",
-                "Me conta rapidinho o que você tá buscando melhorar hoje pra eu te indicar o caminho certo: é sistema de caixa e estoque sem mensalidade pro seu comércio (R$ 150), deixar computador lento voando de novo ou colocar atendimento automático no WhatsApp?"
+                "Me conta rapidinho o que você tá buscando melhorar hoje pra eu te indicar o caminho certo: é nosso Sistema PDV + Estoque + Ponto de Equilíbrio & Frotas na Nuvem (R$ 150 implantação), Otimização de computador ou Atendimento Online 24h?"
             ]
         elif any(p in texto for p in ["4", "jonas", "humano", "pessoa", "dono"]):
             novo_setor = "SETOR_4_JONAS_HUMANO"
@@ -782,17 +780,19 @@ def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tip
         atendente = "Camila"
         novo_setor = "SETOR_1_CINEPRO"
         if any(p in texto for p in ["pix", "pagar", "comprar", "assinar", "quero fechar", "quero assinar", "ativar", "chave", "mensal", "quanto é", "quanto custa", "valor"]):
-            disparar_alerta_cliente_quente(telefone, nome, "CLIENTE PEDIU PIX CINEPRO R$ 30", 30.0)
-            baloes = montar_bloco_pix(pnome, "R$ 30,00 (acesso completo de 30 dias)")
+            baloes = [
+                f"Olha que notícia boa{virgula_nome}: a nossa Central com 200 canais de TV Aberta, Notícias e Rádios é totalmente gratuita no link oficial — não cobramos mensalidade por ela! 🎉",
+                f"Link gratuito: {LINK_PLAYER_IPTV}\n\nAgora, se você quiser contratar um portal personalizado com a sua marca ou o nosso Sistema PDV & Frotas para sua empresa (a partir de R$ 150 implantação), me avisa que eu passo para o Marcos gerar o PIX oficial!"
+            ]
         elif any(p in texto for p in ["smart", "samsung", "lg", "roku", "tv box", "box", "fire", "android", "como instala", "colocar na tv"]):
             baloes = [
-                "Na Smart TV é bem simples! Dá pra abrir direto pelo navegador da própria TV usando aquele link, ou instalar o app rapidinho.",
+                "Na Smart TV ou TV Box é bem simples! Dá pra abrir direto pelo navegador da própria TV usando o nosso link gratuito.",
                 "Qual é a marca da sua TV aí (Samsung, LG, Roku ou TV Box)? Me fala que te explico certinho como colocar!"
             ]
         elif any(p in texto for p in ["abriu", "funcionou", "top", "bom", "gostei", "rodou", "show", "ótimo", "otimo", "sim", "deu certo"]):
             baloes = [
                 f"Que massa{virgula_nome}, fico feliz que rodou liso aí! 😄",
-                "Aproveita bastante o teste! Se já quiser deixar o mês completo garantido por R$ 30, é só me pedir o PIX por aqui, tá bom?"
+                "Pode salvar o link nos favoritos pra assistir quando quiser, sem custo nenhum! Se precisar de Sistema PDV ou suporte pro seu PC ou loja, é só chamar por aqui."
             ]
         else:
             baloes = gerar_resposta_fallback_inteligente("SETOR_1_CINEPRO", pnome, mensagem)
@@ -810,21 +810,21 @@ def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tip
         if any(p in texto for p in ["pix", "chave", "pagar", "comprar", "fechar", "manda a chave", "quero fechar", "vou querer"]):
             if any(k in texto for k in ["combo", "350"]):
                 valor_num, valor_str = 350.0, "R$ 350,00 (Combo Modernização 3 em 1)"
-            elif any(k in texto for k in ["250", "whatsapp", "robo", "robô", "atendimento"]):
-                valor_num, valor_str = 250.0, "R$ 250,00 (Automação de WhatsApp)"
+            elif any(k in texto for k in ["250", "whatsapp", "robo", "robô", "atendimento", "chat"]):
+                valor_num, valor_str = 250.0, "R$ 250,00 (Chat 24h na Nuvem + Automação)"
             else:
-                valor_num, valor_str = 150.0, "R$ 150,00 (taxa única, sem mensalidade)"
+                valor_num, valor_str = 150.0, "R$ 150,00 (Sistema PDV, CRM & Frotas na Nuvem - taxa única)"
             disparar_alerta_cliente_quente(telefone, nome, f"CLIENTE PEDIU PIX COMERCIAL {valor_str}", valor_num)
             baloes = montar_bloco_pix(pnome, valor_str)
-        elif any(p in texto for p in ["loja", "mercado", "mercadinho", "adega", "bar", "lanchonete", "comercio", "comércio", "estoque", "caderno", "planilha", "caixa", "pdv"]):
+        elif any(p in texto for p in ["loja", "mercado", "mercadinho", "adega", "bar", "lanchonete", "comercio", "comércio", "estoque", "caderno", "planilha", "caixa", "pdv", "frota", "locadora"]):
             baloes = [
-                f"Olha que economia boa dá pra fazer aí{virgula_nome}: quem sai do caderno ou de sistema com mensalidade pro nosso PDV Frente de Caixa economiza mais de R$ 1.200 no ano, porque você paga R$ 150 uma única vez e fica seu pra sempre!",
-                "Ele já controla entrada e saída de estoque na hora, aceita leitor de código de barras e mostra o PIX na tela. E se o computador do balcão estiver lento, consigo juntar PDV + Otimização completa da máquina num pacote especial.\n\nPrefere fechar só o PDV de R$ 150 hoje ou quer ver a condição do pacote completo?"
+                f"Olha que economia boa dá pra fazer aí{virgula_nome}: quem sai do caderno ou de sistema com mensalidade pro nosso PDV & ERP na Nuvem economiza mais de R$ 1.200 no ano, porque você paga R$ 150 na implantação sem mensalidade de aluguel do sistema!",
+                "Ele já funciona 100% na nuvem no celular ou computador, controla estoque, calcula Ponto de Equilíbrio, faz venda fiado com cobrança no WhatsApp, gera QR Code PIX na tela e ainda traz módulo de Locadora & Frotas.\n\nPrefere fechar só o PDV de R$ 150 hoje ou quer ver o Combo Completo de R$ 350?"
             ]
         elif any(p in texto for p in ["combo", "pacote", "proposta", "melhoria", "desconto", "tudo", "completo"]):
             baloes = [
                 f"Montei a nossa melhor proposta de modernização pra você{virgula_nome}:",
-                "Fazendo separado sairia R$ 550 (PDV R$ 150 + Windows Boost PRO R$ 150 + Automação WhatsApp R$ 250). Fechando o Combo Modernização 3 em 1 hoje, consigo validar pra você por R$ 350 pagamento único — economia de R$ 200 na hora!",
+                "Fazendo separado sairia R$ 550 (PDV + Frotas na Nuvem R$ 150 + Otimização de PC R$ 150 + Chat 24h & Automação R$ 250). Fechando o Combo Modernização 3 em 1 hoje, consigo validar pra você por R$ 350 pagamento único — economia de R$ 200 na hora!",
                 "Quer que eu já valide essa condição de R$ 350 e te mande a chave PIX oficial?"
             ]
         else:
@@ -1286,7 +1286,7 @@ def rota_cinepro_player_nuvem():
 
 @app.route("/canais.json", methods=["GET"])
 def rota_canais_json_nuvem():
-    """Entrega o catálogo com os milhares de canais CinePro TV direto da Nuvem."""
+    """Entrega o catálogo com 200 canais públicos e rádios selecionados direto da Nuvem."""
     caminho = os.path.join(os.path.dirname(os.path.abspath(__file__)), "canais.json")
     if os.path.exists(caminho):
         with open(caminho, "r", encoding="utf-8") as f:

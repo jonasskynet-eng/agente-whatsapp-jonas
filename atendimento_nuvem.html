@@ -475,9 +475,9 @@
     <div id="typingIndicator" class="typing-ind">Atendente digitando...</div>
 
     <div class="quick-bar">
-      <button class="quick-chip" onclick="enviarAtalho('Quero o teste grátis da TV')">📺 Testar CinePro TV Grátis</button>
-      <button class="quick-chip" onclick="enviarAtalho('Quero assinar a TV no PIX de 30')">💠 Assinar TV (R$ 30)</button>
-      <button class="quick-chip" onclick="enviarAtalho('Quero saber sobre o sistema PDV de R$ 150')">🛒 Sistema PDV (R$ 150)</button>
+      <button class="quick-chip" onclick="enviarAtalho('Quero abrir a Central gratuita de TV Aberta e Rádios')">📺 TV Aberta & Rádios (Grátis)</button>
+      <button class="quick-chip" onclick="enviarAtalho('Quero saber sobre o sistema PDV de R$ 150')">🛒 Sistema PDV & Frotas (R$ 150)</button>
+      <button class="quick-chip" onclick="enviarAtalho('Quero a chave PIX de 150 para o Sistema PDV')">💳 PIX PDV (R$ 150)</button>
       <button class="quick-chip" onclick="enviarAtalho('Quero ver a proposta do combo de R$ 350')">🚀 Combo 3 em 1 (R$ 350)</button>
       <button class="quick-chip" onclick="enviarAtalho('Preciso de suporte técnico')">🛠️ Suporte Técnico</button>
       <button class="quick-chip" onclick="enviarAtalho('Quero falar com o Jonas')">👤 Falar com Jonas</button>
@@ -507,7 +507,7 @@
         </div>
         <div>
           <label style="font-size:0.75rem; color:var(--muted);">Texto do comprovante / Valor pago / Nome do titular:</label>
-          <textarea id="txtComprovanteWeb" rows="3" class="input-mini" style="width:100%; margin-top:4px; resize:vertical;" placeholder="Ex: PIX R$ 30,00 para Jonas Mendonça ID E..."></textarea>
+          <textarea id="txtComprovanteWeb" rows="3" class="input-mini" style="width:100%; margin-top:4px; resize:vertical;" placeholder="Ex: PIX R$ 150,00 para Jonas Mendonça ID E..."></textarea>
         </div>
         <button id="btnEnviarCompWeb" onclick="enviarComprovanteWeb()" class="btn-send" style="padding:11px; width:100%;">
           ✅ Enviar para Conferência na Hora
@@ -634,7 +634,7 @@
       adicionarMensagemTela(
         'bot',
         'Recepção Jonas Tech',
-        'Olá! Bem-vindo ao Atendimento Online 24h da Jonas Tech Solutions (100% na Nuvem).\n\nComo posso ajudar você agora?\n• Testar ou assinar a CinePro TV\n• Sistema PDV & Locadora sem mensalidade\n• Suporte técnico para PC ou TV',
+        'Olá! Bem-vindo ao Atendimento Online 24h da Jonas Tech Solutions (100% na Nuvem).\n\nComo posso ajudar você agora?\n• Sistema PDV, Estoque & Frotas na Nuvem (R$ 150)\n• Chat 24h & Combo de Modernização (R$ 350)\n• Suporte técnico para PC ou sistema\n• Central gratuita com 200 canais de TV Aberta e Rádios',
         ''
       );
     }

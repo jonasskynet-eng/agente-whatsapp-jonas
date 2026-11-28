@@ -313,8 +313,8 @@ header{background:linear-gradient(180deg,rgba(0,0,0,0.96) 0%,rgba(20,20,20,0.92)
                                         <button type="button" class="icon-btn-text btn-netflix-catalog" id="btnNetflixDock" onclick="abrirCatalogoNetflix()" title="Abrir Catálogo Estilo Netflix">
                         <span>🎬</span> <span>Catálogo</span>
                     </button>
-                    <a href="https://wa.me/5511966707293?text=Ol%C3%A1%2C%20Jonas!%20Gostaria%20de%20assinar%20o%20pacote%20VIP%20da%20CinePro%20TV." target="_blank" rel="noopener" class="icon-btn-text" id="btnVipZap" title="Falar com Jonas no WhatsApp / Assinar Canais VIP" style="border-color:rgba(37,211,102,0.45); color:#4ade80; background:rgba(37,211,102,0.12); text-decoration:none;">
-                        <span>💬</span> <span>VIP Zap</span>
+                    <a href="https://wa.me/5511966707293?text=Ol%C3%A1%2C%20Jonas!%20Gostaria%20de%20conhecer%20os%20sistemas%20da%20Jonas%20Tech%20Solutions." target="_blank" rel="noopener" class="icon-btn-text" id="btnVipZap" title="Falar com Jonas no WhatsApp" style="border-color:rgba(37,211,102,0.45); color:#4ade80; background:rgba(37,211,102,0.12); text-decoration:none;">
+                        <span>💬</span> <span>WhatsApp</span>
                     </a>
                     <a href="/atendimento" target="_blank" rel="noopener" class="icon-btn-text" id="btnChatNuvem" title="Atendimento Automático 24h Online (PC dispensado)" style="border-color:rgba(56,189,248,0.45); color:#bae6fd; background:rgba(56,189,248,0.12); text-decoration:none;">
                         <span>🤖</span> <span>Chat 24h</span>
@@ -3488,8 +3488,8 @@ header{background:linear-gradient(180deg,rgba(0,0,0,0.96) 0%,rgba(20,20,20,0.92)
 
     <div id="timerTesteFlutuante">
       <span class="timer-live-dot"></span>
-      <span id="labelStatusAssinatura">Teste Grátis:</span>
-      <span id="relogioRegressivo" class="timer-clock">02:00:00</span>
+      <span id="labelStatusAssinatura">📺 TV Aberta Gratuita:</span>
+      <span id="relogioRegressivo" class="timer-clock">200 Canais</span>
       <button id="btnAbrirLoginAssinante" type="button" onclick="abrirModalLoginAssinante()" style="background:#10b981; color:#051b13; border:none; border-radius:14px; padding:2px 10px; font-size:11px; font-weight:800; cursor:pointer; margin-left:4px;">🔐 Entrar</button>
     </div>
 
@@ -3698,29 +3698,11 @@ header{background:linear-gradient(180deg,rgba(0,0,0,0.96) 0%,rgba(20,20,20,0.92)
             return;
           }
 
-          if (labelStatus) labelStatus.textContent = 'Teste Grátis:';
+          if (labelStatus) labelStatus.textContent = '📺 TV Aberta Gratuita:';
           if (btnEntrar) btnEntrar.style.display = 'inline-block';
 
-          const decorridoSeg = Math.floor((Date.now() - timestampInicio) / 1000);
-          const restanteSeg = DURACAO_TESTE_SEG - decorridoSeg;
-
           if (elRelogio) {
-            elRelogio.textContent = formatarTempo(restanteSeg);
-          }
-
-          if (decorridoSeg >= 900 && !localStorage.getItem(CHAVE_SATISFACAO)) {
-            localStorage.setItem(CHAVE_SATISFACAO, 'true');
-            const mSat = document.getElementById('modalSatisfacao15');
-            if (mSat && restanteSeg > 0) {
-              mSat.style.display = 'flex';
-            }
-          }
-
-          if (restanteSeg <= 0) {
-            const mFim = document.getElementById('modalFimTeste2h');
-            if (mFim) mFim.style.display = 'flex';
-            const vid = document.querySelector('video');
-            if (vid) vid.pause();
+            elRelogio.textContent = '200 Canais';
           }
         }
 
