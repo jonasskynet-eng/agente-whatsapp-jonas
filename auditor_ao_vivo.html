@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Auditor & Quadro de Conexão ao Vivo • CinePro TV & Rádios</title>
+  <style>
+    :root {
+      --fundo: #090d16;
+      --cartao: #111827;
+      --borda: #1f2937;
+      --texto: #f3f4f6;
+      --suave: #9ca3af;
+      --verde: #10b981;
+      --amarelo: #f59e0b;
+      --vermelho: #ef4444;
+      --azul: #38bdf8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Roboto, Arial, sans-serif;
+      background: var(--fundo);
+      color: var(--texto);
+      line-height: 1.5;
+      padding: 20px 16px 40px;
+    }
+    .container { max-width: 1120px; margin: 0 auto; }
+    header {
+      display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center;
+      padding-bottom: 18px; border-bottom: 1px solid var(--borda); margin-bottom: 20px;
+    }
+    h1 { font-size: 1.35rem; font-weight: 700; }
+    .sub { color: var(--suave); font-size: 0.9rem; margin-top: 2px; }
+    .acoes { display: flex; flex-wrap: wrap; gap: 8px; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px; padding: 9px 14px; border-radius: 10px;
+      border: 1px solid var(--borda); background: #172033; color: var(--texto); text-decoration: none;
+      font-size: 0.88rem; font-weight: 600; cursor: pointer;
+      transition: background-color 0.18s ease, border-color 0.18s ease;
+    }
+    .btn:hover { background: #1e293b; border-color: var(--azul); }
+    .btn-primario { background: #065f46; border-color: var(--verde); color: #ecfdf5; }
+    .btn-primario:hover { background: #047857; }
+    .banner-veredito {
+      background: var(--cartao); border: 1px solid var(--borda); border-left: 5px solid var(--verde);
+      border-radius: 14px; padding: 16px 18px; margin-bottom: 20px;
+      display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px;
+    }
+    .banner-veredito.aviso { border-left-color: var(--amarelo); }
+    .banner-veredito.erro { border-left-color: var(--vermelho); }
+    .pill {
+      display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 0.78rem; font-weight: 700;
+      background: rgba(16,185,129,0.16); color: #6ee7b7; border: 1px solid rgba(16,185,129,0.45);
+    }
+    .pill.aviso { background: rgba(245,158,11,0.16); color: #fde68a; border-color: rgba(245,158,11,0.45); }
+    .pill.erro { background: rgba(239,68,68,0.16); color: #fca5a5; border-color: rgba(239,68,68,0.45); }
+    .grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 20px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; margin-bottom: 20px; }
+    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; margin-bottom: 20px; }
+    .card {
+      background: var(--cartao); border: 1px solid var(--borda); border-radius: 14px; padding: 16px;
+    }
+    .card-titulo { font-size: 0.85rem; color: var(--suave); margin-bottom: 6px; font-weight: 600; }
+    .card-valor { font-size: 1.45rem; font-weight: 800; }
+    .card-detalhe { font-size: 0.82rem; color: var(--suave); margin-top: 6px; }
+    h2 { font-size: 1.05rem; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+    .lista-checks { list-style: none; display: flex; flex-direction: column; gap: 6px; margin-top: 10px; font-size: 0.86rem; }
+    .alerta-item {
+      padding: 10px 12px; border-radius: 10px; background: rgba(245,158,11,0.12);
+      border: 1px solid rgba(245,158,11,0.35); color: #fde68a; font-size: 0.88rem; margin-bottom: 8px;
+    }
+    .alerta-item.critico { background: rgba(239,68,68,0.14); border-color: rgba(239,68,68,0.45); color: #fecaca; }
+    .alerta-ok {
+      padding: 10px 12px; border-radius: 10px; background: rgba(16,185,129,0.12);
+      border: 1px solid rgba(16,185,129,0.35); color: #a7f3d0; font-size: 0.88rem;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+    th, td { text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--borda); }
+    th { color: var(--suave); font-weight: 600; }
+    .mono { font-family: Consolas, monospace; font-size: 0.82rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <h1>🛡️ Quadro do Auditor &amp; Conexão ao Vivo</h1>
+        <div class="sub">Verificação em tempo real da nossa Central (TV &amp; Rádios), Latência e Saúde dos 3 Agentes</div>
+      </div>
+      <div class="acoes">
+        <button type="button" id="btnAuditarAgora" class="btn btn-primario" onclick="executarAuditoriaCompleta()">🔍 Auditar Tudo &amp; Testar Ping</button>
+        <a href="/atendimento" class="btn">💬 Chat Online</a>
+        <a href="/tv" class="btn">📺 Abrir TV &amp; Rádios</a>
+      </div>
+    </header>
+
+    <div id="bannerVeredito" class="banner-veredito">
+      <div>
+        <div style="font-size:1.05rem; font-weight:700;" id="txtTituloVeredito">Verificando conexão da nossa Central e da sua internet...</div>
+        <div class="sub" id="txtSubVeredito">Aguarde 2 segundos enquanto medimos servidores, banco de dados e streams ao vivo.</div>
+      </div>
+      <span id="badgeVeredito" class="pill">ANALISANDO</span>
+    </div>
+
+    <div class="grid-4">
+      <div class="card">
+        <div class="card-titulo">📡 Nossa Central na Nuvem</div>
+        <div class="card-valor" id="valNossaPonta">-</div>
+        <div class="card-detalhe" id="detNossaPonta">Banco MongoDB + Servidor</div>
+      </div>
+      <div class="card">
+        <div class="card-titulo">🌐 Sua Conexão Atual (Ping Real)</div>
+        <div class="card-valor" id="valSeuPing">-</div>
+        <div class="card-detalhe" id="detSeuPing">Medindo direto do seu aparelho...</div>
+      </div>
+      <div class="card">
+        <div class="card-titulo">📺 Amostra de Canais &amp; Rádios</div>
+        <div class="card-valor" id="valStreams">-</div>
+        <div class="card-detalhe" id="detStreams">Teste HTTP em tempo real</div>
+      </div>
+      <div class="card">
+        <div class="card-titulo">👑 Grade Liberada no Servidor</div>
+        <div class="card-valor" id="valCatalogo">-</div>
+        <div class="card-detalhe" id="detCatalogo">Abertos + Rádios + VIP</div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom: 20px;">
+      <h2>🚨 Painel do Auditor — Pontos que Precisam de Atenção</h2>
+      <div id="boxAlertas">Carregando avisos do auditor...</div>
+    </div>
+
+    <div class="grid-3" id="gridAgentes"></div>
+
+    <div class="grid-2">
+      <div class="card">
+        <h2>💎 Tabela Oficial de Descontos (TV &amp; App de Rádios)</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Período</th>
+              <th>Preço Gerente</th>
+              <th>Por mês</th>
+              <th>Economia</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>1 Mês (Camila)</td><td>R$ 30,00</td><td>R$ 30,00</td><td>Tabela padrão</td></tr>
+            <tr><td>2 Meses</td><td><strong>R$ 50,00</strong></td><td>R$ 25,00</td><td>R$ 10,00 off</td></tr>
+            <tr><td>3 Meses</td><td><strong>R$ 70,00</strong></td><td>R$ 23,33</td><td>R$ 20,00 off</td></tr>
+            <tr><td>4 Meses</td><td><strong>R$ 90,00</strong></td><td>R$ 22,50</td><td>1 mês grátis (R$ 30)</td></tr>
+            <tr><td>6 Meses</td><td><strong>R$ 130,00</strong></td><td>R$ 21,67</td><td>R$ 50,00 off</td></tr>
+            <tr><td>8 Meses</td><td><strong>R$ 160,00</strong></td><td>R$ 20,00</td><td>R$ 80,00 off</td></tr>
+            <tr><td>12 Meses (1 Ano)</td><td><strong>R$ 220,00</strong></td><td>R$ 18,33</td><td>R$ 140,00 off</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <h2>⏱️ Últimas Medições de Streams &amp; Atendimentos</h2>
+        <div id="boxStreams" style="margin-bottom: 12px;"></div>
+        <div id="boxEventos"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function esc(t) {
+      return String(t || '').replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
+    }
+
+    async function medirPingCliente() {
+      const tempos = [];
+      for (let i = 0; i < 3; i++) {
+        const t0 = performance.now();
+        try {
+          const r = await fetch('/api/auditor/ping?t=' + Date.now() + '_' + i, { cache: 'no-store' });
+          if (r.ok) tempos.push(Math.round(performance.now() - t0));
+        } catch (_) {}
+      }
+      const elVal = document.getElementById('valSeuPing');
+      const elDet = document.getElementById('detSeuPing');
+      if (!tempos.length) {
+        elVal.textContent = 'Sem resposta';
+        elVal.style.color = '#ef4444';
+        elDet.textContent = 'Sua internet falhou ao alcançar o servidor.';
+        return { ok: false, media: 9999 };
+      }
+      const media = Math.round(tempos.reduce((a, b) => a + b, 0) / tempos.length);
+      const jitter = Math.max(...tempos) - Math.min(...tempos);
+      elVal.textContent = media + ' ms';
+      elVal.style.color = media < 450 ? '#10b981' : (media < 1000 ? '#f59e0b' : '#ef4444');
+      elDet.textContent = `Amostras: ${tempos.join(' / ')} ms (oscilação ${jitter} ms)`;
+      return { ok: true, media, jitter };
+    }
+
+    function renderizarRelatorio(d, pingCli) {
+      const rede = d.rede || {};
+      const mongoMs = rede.mongo_ms ?? 0;
+      const streamMs = rede.stream_ms ?? 0;
+
+      const elNossa = document.getElementById('valNossaPonta');
+      elNossa.textContent = rede.status_geral || 'ONLINE';
+      elNossa.style.color = rede.status_geral === 'ONLINE' ? '#10b981' : '#f59e0b';
+      document.getElementById('detNossaPonta').textContent = `MongoDB Atlas: ${mongoMs} ms • Medido às ${rede.medido_em || '-'}`;
+
+      document.getElementById('valStreams').textContent = `${rede.streams_online || 0}/${rede.streams_testados || 0} Online`;
+      document.getElementById('detStreams').textContent = `Latência média dos canais: ${streamMs} ms`;
+
+      document.getElementById('valCatalogo').textContent = `${rede.qtd_abertos || 0} + ${rede.qtd_vip || 0} VIP`;
+      document.getElementById('detCatalogo').textContent = rede.qtd_vip > 0 ? 'Lista VIP ativa no servidor' : '200 livres/rádios ativos (VIP aguardando lista)';
+
+      const banner = document.getElementById('bannerVeredito');
+      const badge = document.getElementById('badgeVeredito');
+      const titulo = document.getElementById('txtTituloVeredito');
+      const sub = document.getElementById('txtSubVeredito');
+
+      banner.className = 'banner-veredito';
+      badge.className = 'pill';
+      if (rede.status_geral === 'ONLINE' && pingCli.ok && pingCli.media < 600) {
+        titulo.textContent = '✅ Nossa parte já está 100% online e rápida — e sua conexão está boa!';
+        sub.textContent = `Nossa central respondeu normalmente (${mongoMs} ms banco / ${streamMs} ms streams) e seu aparelho respondeu em ${pingCli.media} ms.`;
+        badge.textContent = 'CONEXÃO 100% ESTÁVEL';
+      } else if (rede.status_geral === 'ONLINE' && (!pingCli.ok || pingCli.media >= 600)) {
+        banner.classList.add('aviso');
+        badge.classList.add('aviso');
+        titulo.textContent = '⚠️ Nossa Central está ONLINE, mas sua conexão atual está lenta/oscilando';
+        sub.textContent = `Nossos servidores estão estáveis, porém seu aparelho levou ${pingCli.media} ms para responder. Recomendamos mudar para Wi-Fi 5G ou reiniciar seu roteador.`;
+        badge.textContent = 'OSCILAÇÃO NA REDE DO USUÁRIO';
+      } else {
+        banner.classList.add('erro');
+        badge.classList.add('erro');
+        titulo.textContent = '🚨 O Auditor identificou lentidão ou falha na rota do servidor';
+        sub.textContent = `Status detectado: ${rede.resumo || 'verificando'}. O aviso já foi registrado para ajuste técnico.`;
+        badge.textContent = 'AUDITORIA ACIONADA';
+      }
+
+      const boxAlertas = document.getElementById('boxAlertas');
+      const alertas = d.alertas || [];
+      if (!alertas.length) {
+        boxAlertas.innerHTML = '<div class="alerta-ok">✅ Nenhum gargalo crítico detectado: os 3 agentes e a infraestrutura passaram na auditoria!</div>';
+      } else {
+        boxAlertas.innerHTML = alertas.map(a => {
+          const crit = a.startsWith('CRITICO') || a.startsWith('CONEXAO');
+          return `<div class="alerta-item ${crit ? 'critico' : ''}">${esc(a)}</div>`;
+        }).join('');
+      }
+
+      const gridAgentes = document.getElementById('gridAgentes');
+      const ag = d.agentes || {};
+      gridAgentes.innerHTML = ['Camila', 'Lucas', 'Marcos'].map(nome => {
+        const info = ag[nome] || {};
+        const ok = info.aprovada !== false;
+        const checksHtml = (info.checks || []).map(c => `<li>${c.ok ? '✅' : '⚠️'} ${esc(c.nome)}</li>`).join('');
+        return `
+          <div class="card">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+              <h2 style="margin:0;">${nome === 'Camila' ? '👩‍💼 Camila' : nome === 'Lucas' ? '🛠️ Lucas' : '🤝 Gerente Marcos'}</h2>
+              <span class="pill ${ok ? '' : 'erro'}">${ok ? 'FUNCIONANDO' : 'AUDITAR'}</span>
+            </div>
+            <div class="card-detalhe">${esc(info.papel || '')}</div>
+            <div class="card-detalhe" style="margin-top:8px;">Atendimentos: <strong>${info.atendimentos || 0}</strong> • Falhas: <strong>${info.erros || 0}</strong> • Último uso: <strong>${esc(info.ultimo_uso || '-')}</strong></div>
+            <ul class="lista-checks">${checksHtml}</ul>
+          </div>
+        `;
+      }).join('');
+
+      const amostras = rede.amostras || [];
+      document.getElementById('boxStreams').innerHTML = amostras.length
+        ? '<table><thead><tr><th>Amostra ao Vivo</th><th>HTTP</th><th>Latência</th></tr></thead><tbody>' +
+          amostras.map(s => `<tr><td>${s.online ? '🟢' : '🔴'} ${esc(s.nome)}</td><td>${esc(s.http)}</td><td class="mono">${esc(s.latencia_ms)} ms</td></tr>`).join('') +
+          '</tbody></table>'
+        : '<div class="card-detalhe">Nenhuma amostra de stream registrada ainda.</div>';
+
+      const evs = d.ultimos_eventos || [];
+      document.getElementById('boxEventos').innerHTML = evs.length
+        ? '<h3 style="font-size:0.9rem; margin:10px 0 6px; color:#9ca3af;">Últimos registros auditados</h3>' +
+          '<table><thead><tr><th>Hora</th><th>Agente</th><th>Setor</th><th>Tempo</th></tr></thead><tbody>' +
+          evs.slice(0, 8).map(e => `<tr><td class="mono">${esc(e.horario)}</td><td>${esc(e.atendente)}</td><td class="mono">${esc(e.setor)}</td><td class="mono">${esc(e.tempo_ms)} ms</td></tr>`).join('') +
+          '</tbody></table>'
+        : '<div class="card-detalhe" style="margin-top:10px;">Aguardando os próximos atendimentos no chat/WhatsApp para listar aqui.</div>';
+    }
+
+    async function carregarStatusInicial() {
+      const [pingCli, resp] = await Promise.all([
+        medirPingCliente(),
+        fetch('/api/auditor/status').then(r => r.json())
+      ]);
+      renderizarRelatorio(resp, pingCli);
+    }
+
+    async function executarAuditoriaCompleta() {
+      const btn = document.getElementById('btnAuditarAgora');
+      btn.disabled = true;
+      btn.textContent = '⏳ Auditando ao vivo...';
+      try {
+        const [pingCli, resp] = await Promise.all([
+          medirPingCliente(),
+          fetch('/api/auditor/executar', { method: 'POST' }).then(r => r.json())
+        ]);
+        renderizarRelatorio(resp, pingCli);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '🔍 Auditar Tudo & Testar Ping';
+      }
+    }
+
+    carregarStatusInicial();
+    setInterval(carregarStatusInicial, 20000);
+  </script>
+</body>
+</html>

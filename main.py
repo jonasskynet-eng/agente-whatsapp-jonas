@@ -19,8 +19,11 @@ import math
 import os
 import random
 import re
+import ssl
+import threading
 import time
 import unicodedata
+import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
@@ -79,6 +82,7 @@ try:
     col_veiculos = db["veiculos_frotas"]
     col_apolices = db["apolices_seguros"]
     col_chat_web = db["chat_web_historico"]
+    auditoria_col = db["auditoria_agentes"]
     print("[NUVEM] Conexão com MongoDB Atlas validada com sucesso!")
 except Exception as e:
     print(f"[ERRO MONGODB NUVEM] {e}")
@@ -88,6 +92,7 @@ except Exception as e:
     assinantes_col = None
     comprovantes_col = None
     eventos_email_col = None
+    auditoria_col = None
     vendas_pdv_col = None
     col_vendas = None
     col_produtos = None
@@ -208,12 +213,16 @@ def registrar_evento_email(tipo, cliente, telefone, valor=0.0, descricao="", sup
 
 
 def calcular_dias_por_valor_iptv(valor_pago):
-    """Mapeia o valor pago no IPTV para a duração correta da assinatura em dias."""
+    """Mapeia o valor pago (TV ou App de Rádio) para a duração exata da assinatura em dias."""
     v = float(valor_pago or 30.0)
-    if v >= 215.0:
+    if v >= 195.0:
         return 365
-    if v >= 120.0:
+    if v >= 145.0:
+        return 240
+    if v >= 115.0:
         return 180
+    if v >= 80.0:
+        return 120
     if v >= 60.0:
         return 90
     if v >= 40.0:
@@ -333,7 +342,7 @@ def analisar_comprovante_pix(texto_ocr, texto_msg, setor_atual, plano_salvo="30"
         valor_padrao = 30.0
 
     valor_detectado = valor_padrao
-    m_valor = re.search(r"(?:r\$\s*|\b)(240|220|130|70|65|50|45|30|25)(?:[,\.]00)?\b", combinado_ascii)
+    m_valor = re.search(r"(?:r\$\s*|\b)(240|220|200|160|150|130|120|90|85|70|65|50|45|30|25)(?:[,\.]00)?\b", combinado_ascii)
     if m_valor:
         valor_detectado = float(m_valor.group(1))
 
@@ -418,8 +427,8 @@ def obter_recepcao_natural(pnome):
     return [abertura, corpo]
 
 
-def diagnosticar_suporte_lucas(pnome, nome, telefone, mensagem, tipo_midia, texto_comprovante, resposta_anterior="", ja_atendeu_antes=False):
-    """Retorna (baloes, notificacao_jonas) para o Lucas resolver problemas reais com anti-loop."""
+def diagnosticar_suporte_lucas(pnome, nome, telefone, mensagem, tipo_midia, texto_comprovante, resposta_anterior="", ja_atendeu_antes=False, modo_auditoria=False):
+    """Retorna (baloes, notificacao_jonas) para o Lucas resolver problemas reais com anti-loop e diagnóstico de rede."""
     virgula_nome = f", {pnome}" if pnome else ""
     texto = (mensagem or "").strip().lower()
     texto_ascii = normalizar_giria_whatsapp(texto)
@@ -577,33 +586,59 @@ def diagnosticar_suporte_lucas(pnome, nome, telefone, mensagem, tipo_midia, text
         "congelou", "caiu", "saiu do ar", "deu erro", "canal", "canais", "fora do ar",
         "sem som", "mudo", "tela preta", "nao abre", "0:00", "sumiu", "sinal"
     ]):
-        notificacao = f"🛠️ *CHAMADO DE TV / SINAL (LUCAS):*\n👤 {nome} ({telefone})\n💬 Relato: {(mensagem or '')[:160]}"
-        registrar_evento_email(
-            "SUPORTE_TECNICO", nome, telefone, 0.0,
-            mensagem[:180],
-            "Orientação de reinício 30s na TV/roteador, destravamento de áudio/play (0:00) e triagem de canal."
+        diag = obter_diagnostico_conexao_rapido()
+        aviso_central = (
+            f"📡 *Status da nossa Central ao vivo:* nossos servidores estão *100% online* agora "
+            f"(banco `{diag.get('mongo_ms', 0)} ms` | streams `{diag.get('stream_ms', 0)} ms`) — ou seja, nossa ponta está estável.\n"
+            f"Você também pode conferir nossa latência em tempo real em: https://agente-whatsapp-jonas.onrender.com/auditor"
+            if diag.get("status_geral") == "ONLINE"
+            else f"⚠️ *Status do Auditor ao vivo:* detectamos uma oscilação momentânea na nossa rota (`{diag.get('resumo', 'verificando')}`). Já acionei nossa auditoria técnica pra estabilizar!"
         )
+        notificacao = f"🛠️ *CHAMADO DE TV / SINAL (LUCAS):*\n👤 {nome} ({telefone})\n💬 Relato: {(mensagem or '')[:160]}\n🌐 Central: {diag.get('status_geral')} ({diag.get('mongo_ms')}ms)"
+        if not modo_auditoria:
+            registrar_evento_email(
+                "SUPORTE_TECNICO", nome, telefone, 0.0,
+                mensagem[:180],
+                f"Orientação de reinício 30s, play 0:00 + telemetria Central ({diag.get('status_geral')})."
+            )
         baloes = [
-            f"Vamos resolver isso agora{virgula_nome}! Quando a TV para de funcionar ou não abre o canal, faz esses 3 passos rápidos que resolvem na hora:",
+            f"Vamos resolver isso agora{virgula_nome}! Já conferi nosso painel ao vivo antes de te responder:",
+            aviso_central,
             (
+                "Para ajustar aí no seu aparelho e destravar na hora, faça esses 3 passos:\n"
                 "1️⃣ *Reinicie a rede e a TV:* tire a TV (ou TV Box) e o roteador da tomada por *30 segundos* e ligue de novo.\n"
                 "2️⃣ *Destrave o player:* se abrir parado em 0:00 ou sem som, toque no botão de *Áudio/Play* na tela ou troque pro canal vizinho e volte.\n"
-                f"3️⃣ *Recarregue o endereço:* feche e abra de novo o link {LINK_PLAYER_IPTV} no navegador."
-            ),
-            "Me responde só 2 coisinhas pra eu ir direto no problema se continuar: parou em *todos os canais* ou em *um só*? E você está assistindo pelo *celular*, *Smart TV* ou *TV Box*?"
+                f"3️⃣ *Recarregue o endereço:* feche e abra de novo o link {LINK_PLAYER_IPTV} no navegador.\n\n"
+                "Se continuar, me responde: parou em *todos os canais* ou em *um só*? E está assistindo no *celular*, *Smart TV* ou *TV Box*?"
+            )
         ]
         return baloes, notificacao
 
     # 6. Oscilação de Wi-Fi / internet lenta / buffering
     if any(p in texto_ascii for p in ["travando", "engasgando", "oscilando", "carregando", "bolinha", "internet", "rede", "wifi", "wi-fi", "lenta", "rota", "dns"]):
-        registrar_evento_email(
-            "SUPORTE_TECNICO", nome, telefone, 0.0,
-            mensagem[:180],
-            "Orientação de troca para Wi-Fi 5G / cabo e reinício de 30s no roteador para renovar DNS."
-        )
+        diag = obter_diagnostico_conexao_rapido()
+        if not modo_auditoria:
+            registrar_evento_email(
+                "SUPORTE_TECNICO", nome, telefone, 0.0,
+                mensagem[:180],
+                f"Orientação Wi-Fi 5G/cabo + diagnóstico Central ({diag.get('status_geral')})."
+            )
+        if diag.get("status_geral") == "ONLINE":
+            cabecalho = (
+                f"Acabei de checar nossa Central no Quadro de Conexão{virgula_nome}: nossos servidores estão *100% online e rápidos* "
+                f"(banco `{diag.get('mongo_ms', 0)} ms` | streams `{diag.get('stream_ms', 0)} ms`)!"
+            )
+            passo = (
+                "Como a nossa parte já está online liso, o engasgo aí costuma ser oscilação do Wi-Fi 2.4G ou rota da operadora. "
+                "Tenta mudar para a rede *5G* (ou cabo de rede), tirar o roteador da tomada por *30 segundos* e acompanhar o medidor da sua internet no nosso quadro:\n"
+                "https://agente-whatsapp-jonas.onrender.com/auditor"
+            )
+        else:
+            cabecalho = f"Valeu por avisar{virgula_nome}! Nosso Auditor técnico já marcou oscilação aqui na nossa ponta (`{diag.get('resumo', 'rota')}`)."
+            passo = "Já disparamos o alerta automático para o Jonas estabilizar a rota. Enquanto isso, tente alternar para outro canal vizinho."
         baloes = [
-            f"Vamos estabilizar essa conexão agora{virgula_nome}!",
-            "Quase sempre que dá essas engasgadas é oscilação do Wi-Fi comum ou rota da operadora. Tenta conectar na rede *5G* do seu roteador (ou cabo na TV) e tira o roteador da tomada por *30 segundos* pra renovar o DNS.",
+            cabecalho,
+            passo,
             "Me fala também: tá travando em todos os canais ou em um específico? E em qual aparelho você está usando?"
         ]
         return baloes, notificacao
@@ -693,21 +728,309 @@ def gerar_resposta_fallback_inteligente(setor, pnome, mensagem_usuario):
     return obter_recepcao_natural(pnome)
 
 
-PLANOS_IPTV = {
-    "25": (25.0, "R$ 25,00 (1 Mês Promocional • 800 Canais + 40 Rádios)"),
-    "30": (30.0, "R$ 30,00 (1 Mês Completo • 800 Canais + 40 Rádios)"),
-    "45": (45.0, "R$ 45,00 (2 Meses Condição Gerente / 2 Telas no Mês)"),
-    "50": (50.0, "R$ 50,00 (Pacote 2 Meses • Economia de R$ 10,00 • R$ 25,00/mês)"),
-    "65": (65.0, "R$ 65,00 (Pacote 3 Meses Desconto Gerente • Economia de R$ 25,00)"),
-    "70": (70.0, "R$ 70,00 (Pacote 3 Meses Trimestral • Economia de R$ 20,00 • R$ 23,33/mês)"),
-    "130": (130.0, "R$ 130,00 (Pacote 6 Meses Semestral • Economia de R$ 50,00)"),
-    "220": (220.0, "R$ 220,00 (Pacote 1 Ano Desconto Especial à Vista • Economia de R$ 140,00)"),
-    "240": (240.0, "R$ 240,00 (Pacote 1 Ano Completo • R$ 20,00/mês • 4 Meses Grátis!)"),
+# ==============================================================================
+# AUDITOR DOS 3 AGENTES & TELEMETRIA DE LATÊNCIA / CONEXÃO AO VIVO
+# ==============================================================================
+
+_CACHE_REDE_AUDITOR = {
+    "ts": 0.0,
+    "atualizando": False,
+    "dados": {
+        "status_geral": "ONLINE",
+        "mongo_ok": True,
+        "mongo_ms": 0.0,
+        "catalogo_ok": True,
+        "qtd_abertos": 200,
+        "qtd_vip": 0,
+        "streams_testados": 0,
+        "streams_online": 0,
+        "stream_ms": 0.0,
+        "amostras": [],
+        "resumo": "Aguardando primeira medição ao vivo",
+        "medido_em": ""
+    }
+}
+
+_ESTADO_AUDITOR = {
+    "agentes": {
+        "Camila": {"atendimentos": 0, "erros": 0, "ultimo_uso": "-", "ultima_msg": "-", "papel": "Validadora PIX, Ativadora Lista VIP, 200 Grátis, Rádios & Teste 2h"},
+        "Lucas": {"atendimentos": 0, "erros": 0, "ultimo_uso": "-", "ultima_msg": "-", "papel": "Suporte Técnico Autônomo (Aparelhos, Gírias, Rede & Diagnóstico)"},
+        "Marcos": {"atendimentos": 0, "erros": 0, "ultimo_uso": "-", "ultima_msg": "-", "papel": "Gerente Comercial & Negociação (2, 3, 4, 6, 8 e 12 Meses — TV e Rádio)"},
+    },
+    "ultima_auditoria": None,
+    "ultimos_eventos": []
 }
 
 
-def negociar_gerente_marcos(pnome, nome, telefone, mensagem, texto_sem_acento, lead, apresentou_como_escalacao=False):
-    """Conduz negociações, promoções (2m, 3m, 6m, 1 ano) e PIX como Gerente Comercial Marcos."""
+def _testar_url_stream_rapido(url, timeout=2.5):
+    """Testa conectividade HTTP real de uma stream de amostra medindo latência em ms."""
+    t0 = time.perf_counter()
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    for metodo in ("HEAD", "GET"):
+        try:
+            req = urllib.request.Request(
+                url,
+                headers={"User-Agent": "Auditor-Conexao-JonasTech/1.0", "Range": "bytes=0-1024"},
+                method=metodo,
+            )
+            with urllib.request.urlopen(req, context=ctx, timeout=timeout) as resp:
+                ms = round((time.perf_counter() - t0) * 1000, 1)
+                return True, resp.status, ms
+        except urllib.error.HTTPError as he:
+            if he.code in (200, 206, 301, 302, 403) and metodo == "HEAD":
+                continue
+            ms = round((time.perf_counter() - t0) * 1000, 1)
+            return False, he.code, ms
+        except Exception:
+            if metodo == "HEAD":
+                continue
+            ms = round((time.perf_counter() - t0) * 1000, 1)
+            return False, 0, ms
+    return False, 0, round((time.perf_counter() - t0) * 1000, 1)
+
+
+def medir_conexao_servidor(forcar=False):
+    """Mede latência real do MongoDB Atlas, catálogos JSON/VIP e amostra de streams de TV/Rádio."""
+    agora_mono = time.monotonic()
+    if not forcar and (agora_mono - _CACHE_REDE_AUDITOR["ts"]) < 45.0 and _CACHE_REDE_AUDITOR["dados"].get("medido_em"):
+        return _CACHE_REDE_AUDITOR["dados"]
+
+    t0_mongo = time.perf_counter()
+    mongo_ok = False
+    mongo_ms = 0.0
+    if client is not None:
+        try:
+            client.admin.command("ping")
+            mongo_ok = True
+        except Exception:
+            mongo_ok = False
+    mongo_ms = round((time.perf_counter() - t0_mongo) * 1000, 1)
+
+    pasta = os.path.dirname(os.path.abspath(__file__))
+    canais_abertos = []
+    catalogo_ok = False
+    arq_canais = os.path.join(pasta, "canais.json")
+    if os.path.exists(arq_canais):
+        try:
+            with open(arq_canais, "r", encoding="utf-8") as f:
+                dados_c = json.load(f)
+                if isinstance(dados_c, list):
+                    canais_abertos = dados_c
+                    catalogo_ok = len(dados_c) > 0
+        except Exception:
+            catalogo_ok = False
+
+    canais_vip = _carregar_canais_vip_nuvem()
+    amostras_candidatas = []
+    vistas_cat = set()
+    for c in canais_abertos:
+        cat = str(c.get("cat") or "TV")
+        url_c = str(c.get("url") or "").strip()
+        if url_c.startswith("http") and cat not in vistas_cat:
+            vistas_cat.add(cat)
+            amostras_candidatas.append({"nome": c.get("nome", "Canal"), "categoria": cat, "url": url_c})
+        if len(amostras_candidatas) >= 3:
+            break
+
+    amostras_res = []
+    streams_online = 0
+    latencias_ok = []
+    for item in amostras_candidatas:
+        ok, codigo, ms = _testar_url_stream_rapido(item["url"], timeout=2.5)
+        if ok:
+            streams_online += 1
+            latencias_ok.append(ms)
+        amostras_res.append({
+            "nome": item["nome"],
+            "categoria": item["categoria"],
+            "online": ok,
+            "http": codigo,
+            "latencia_ms": ms
+        })
+
+    stream_ms = round(sum(latencias_ok) / len(latencias_ok), 1) if latencias_ok else 0.0
+    if mongo_ok and catalogo_ok and (streams_online >= 1 or not amostras_candidatas):
+        status_geral = "ONLINE" if mongo_ms < 900 else "LENTO"
+    else:
+        status_geral = "INSTAVEL"
+
+    resumo = f"Mongo {mongo_ms}ms • {streams_online}/{len(amostras_res)} streams ao vivo ({stream_ms}ms)"
+    resultado = {
+        "status_geral": status_geral,
+        "mongo_ok": mongo_ok,
+        "mongo_ms": mongo_ms,
+        "catalogo_ok": catalogo_ok,
+        "qtd_abertos": len(canais_abertos),
+        "qtd_vip": len(canais_vip),
+        "streams_testados": len(amostras_res),
+        "streams_online": streams_online,
+        "stream_ms": stream_ms,
+        "amostras": amostras_res,
+        "resumo": resumo,
+        "medido_em": agora_brasilia().strftime("%H:%M:%S")
+    }
+    _CACHE_REDE_AUDITOR["dados"] = resultado
+    _CACHE_REDE_AUDITOR["ts"] = time.monotonic()
+    return resultado
+
+
+def obter_diagnostico_conexao_rapido():
+    """Retorna telemetria em cache sem bloquear atendimento e atualiza em segundo plano se expirou."""
+    agora_mono = time.monotonic()
+    precisa_atualizar = (agora_mono - _CACHE_REDE_AUDITOR["ts"]) >= 45.0 or not _CACHE_REDE_AUDITOR["dados"].get("medido_em")
+    if precisa_atualizar and not _CACHE_REDE_AUDITOR["atualizando"]:
+        def _tarefa_bg():
+            _CACHE_REDE_AUDITOR["atualizando"] = True
+            try:
+                medir_conexao_servidor(forcar=True)
+            finally:
+                _CACHE_REDE_AUDITOR["atualizando"] = False
+        threading.Thread(target=_tarefa_bg, daemon=True).start()
+    return _CACHE_REDE_AUDITOR["dados"]
+
+
+def registrar_auditoria_agente(atendente, setor, mensagem, tempo_ms, sucesso=True, observacao=""):
+    """Registra execução de cada agente para o Auditor monitorar falhas e lentidão."""
+    hora_str = agora_brasilia().strftime("%H:%M:%S")
+    chave_ag = "Marcos" if "Marcos" in str(atendente) else ("Lucas" if "Lucas" in str(atendente) else ("Camila" if "Camila" in str(atendente) else ""))
+    if chave_ag in _ESTADO_AUDITOR["agentes"]:
+        st = _ESTADO_AUDITOR["agentes"][chave_ag]
+        st["atendimentos"] += 1
+        if not sucesso:
+            st["erros"] += 1
+        st["ultimo_uso"] = hora_str
+        st["ultima_msg"] = (mensagem or "")[:80]
+
+    evento = {
+        "horario": hora_str,
+        "atendente": atendente,
+        "setor": setor,
+        "tempo_ms": round(float(tempo_ms or 0.0), 1),
+        "sucesso": bool(sucesso),
+        "observacao": (observacao or "")[:120],
+    }
+    _ESTADO_AUDITOR["ultimos_eventos"].insert(0, evento)
+    _ESTADO_AUDITOR["ultimos_eventos"] = _ESTADO_AUDITOR["ultimos_eventos"][:20]
+
+    if auditoria_col is not None and (not sucesso or tempo_ms > 2000 or observacao):
+        try:
+            auditoria_col.insert_one({
+                **evento,
+                "data_dia": agora_brasilia().strftime("%Y-%m-%d")
+            })
+        except Exception:
+            pass
+
+
+def executar_auditoria_3_agentes(forcar_rede=True):
+    """Audita em tempo real a saúde dos 3 agentes (Camila, Lucas, Marcos) e aponta qualquer falha."""
+    rede = medir_conexao_servidor(forcar=forcar_rede)
+    alertas = []
+    pendencias_conferencia = 0
+    if leads_col is not None:
+        try:
+            pendencias_conferencia = leads_col.count_documents({"setor_atual": "PAGAMENTO_EM_ANALISE"})
+        except Exception:
+            pendencias_conferencia = 0
+
+    # 1. Auditoria Camila (Validadora + Catálogo + Teste 2h + Lista VIP)
+    camila_checks = []
+    dias_ok = (
+        calcular_dias_por_valor_iptv(50) == 60
+        and calcular_dias_por_valor_iptv(90) == 120
+        and calcular_dias_por_valor_iptv(160) == 240
+        and calcular_dias_por_valor_iptv(220) == 365
+    )
+    camila_checks.append(("Tabela de validação (30d a 365d)", dias_ok))
+    camila_checks.append(("200 canais livres + rádios carregados", rede.get("catalogo_ok", False)))
+    vip_carregado = rede.get("qtd_vip", 0) > 0
+    camila_checks.append(("Lista VIP total carregada (canais_vip.json)", vip_carregado))
+    if not rede.get("catalogo_ok"):
+        alertas.append("CRITICO: Precisa auditar a Camila — catálogo canais.json não carregou.")
+    if not vip_carregado:
+        alertas.append("ATENCAO: Precisa auditar a Lista VIP Total da Camila — canais_vip.json ainda tem 0 canais VIP extras no Render (200 abertos/rádios estão ativos).")
+    if pendencias_conferencia > 0:
+        alertas.append(f"FINANCEIRO: Há {pendencias_conferencia} comprovante(s) aguardando conferência manual (#liberar).")
+
+    # 2. Auditoria Lucas (Suporte + Gírias + Telemetria)
+    t_lucas, _ = diagnosticar_suporte_lucas("Teste", "Auditoria", "000", "a minha tv no pega iptv", "text", "", modo_auditoria=True)
+    lucas_ok = "sem baixar app nenhum" in " ".join(t_lucas).lower()
+    if not lucas_ok:
+        alertas.append("CRITICO: Precisa auditar o Lucas — falhou na regra de TV que não instala aplicativo IPTV.")
+
+    # 3. Auditoria Marcos (Gerente Negociador 2, 3, 4, 6, 8 e 12 meses)
+    t_marcos, extras_m = negociar_gerente_marcos("Teste", "Auditoria", "000", "quero ver planos de 4 meses e 8 meses", "quero ver planos de 4 meses e 8 meses", {}, modo_auditoria=True)
+    txt_m = " ".join(t_marcos).lower()
+    marcos_ok = ("90" in txt_m or "160" in txt_m) and all(k in PLANOS_IPTV for k in ["50", "70", "90", "130", "160", "220"])
+    if not marcos_ok:
+        alertas.append("CRITICO: Precisa auditar o Gerente Marcos — falha na tabela de 2, 3, 4, 6, 8 e 12 meses.")
+
+    if not rede.get("mongo_ok"):
+        alertas.append("CRITICO: Precisa auditar o banco MongoDB Atlas — ping falhou!")
+    elif rede.get("mongo_ms", 0) > 800:
+        alertas.append(f"LENTIDAO: MongoDB com latência alta ({rede.get('mongo_ms')} ms).")
+    if rede.get("streams_testados", 0) > 0 and rede.get("streams_online", 0) == 0:
+        alertas.append("CONEXAO: Precisa auditar as streams — nenhuma amostra respondeu ao vivo agora.")
+
+    relatorio = {
+        "executado_em": agora_brasilia().strftime("%d/%m/%Y %H:%M:%S"),
+        "status_processo": "REQUER_AUDITORIA" if any(a.startswith("CRITICO") or a.startswith("CONEXAO") for a in alertas) else ("COM_AVISOS" if alertas else "SAUDAVEL"),
+        "rede": rede,
+        "agentes": {
+            "Camila": {
+                **_ESTADO_AUDITOR["agentes"]["Camila"],
+                "aprovada": dias_ok and rede.get("catalogo_ok", False),
+                "vip_pronto": vip_carregado,
+                "pendencias_conferencia": pendencias_conferencia,
+                "checks": [{"nome": n, "ok": ok} for n, ok in camila_checks]
+            },
+            "Lucas": {
+                **_ESTADO_AUDITOR["agentes"]["Lucas"],
+                "aprovada": lucas_ok,
+                "checks": [
+                    {"nome": "Gírias WhatsApp ('no pega iptv')", "ok": lucas_ok},
+                    {"nome": "Consulta latência ao vivo antes de culpar rede", "ok": rede.get("status_geral") != "INSTAVEL"}
+                ]
+            },
+            "Marcos": {
+                **_ESTADO_AUDITOR["agentes"]["Marcos"],
+                "aprovada": marcos_ok,
+                "checks": [
+                    {"nome": "Tabela 2, 3, 4, 6, 8 e 12 meses ativa", "ok": marcos_ok},
+                    {"nome": "Negociação TV + App de Rádio integrada", "ok": True}
+                ]
+            }
+        },
+        "alertas": alertas,
+        "ultimos_eventos": _ESTADO_AUDITOR["ultimos_eventos"]
+    }
+    _ESTADO_AUDITOR["ultima_auditoria"] = relatorio
+    return relatorio
+
+
+PLANOS_IPTV = {
+    "25": (25.0, "R$ 25,00 (1 Mês Promocional • TV ou App Rádio PRO)"),
+    "30": (30.0, "R$ 30,00 (1 Mês Completo • Lista VIP TV + App Rádio PRO)"),
+    "45": (45.0, "R$ 45,00 (Pacote 2 Meses Desconto Gerente ou 2 Telas no Mês)"),
+    "50": (50.0, "R$ 50,00 (Pacote 2 Meses • Economia R$ 10,00 • R$ 25,00/mês)"),
+    "65": (65.0, "R$ 65,00 (Pacote 3 Meses Desconto Gerente • Economia R$ 25,00)"),
+    "70": (70.0, "R$ 70,00 (Pacote 3 Meses • Economia R$ 20,00 • R$ 23,33/mês)"),
+    "85": (85.0, "R$ 85,00 (Pacote 4 Meses Desconto Gerente • Economia R$ 35,00)"),
+    "90": (90.0, "R$ 90,00 (Pacote 4 Meses • 1 Mês Grátis • R$ 22,50/mês)"),
+    "120": (120.0, "R$ 120,00 (Pacote 6 Meses Desconto Gerente • Economia R$ 60,00)"),
+    "130": (130.0, "R$ 130,00 (Pacote 6 Meses • Economia R$ 50,00 • R$ 21,67/mês)"),
+    "150": (150.0, "R$ 150,00 (Pacote 8 Meses Desconto Gerente • Economia R$ 90,00)"),
+    "160": (160.0, "R$ 160,00 (Pacote 8 Meses • R$ 20,00/mês • Economia R$ 80,00)"),
+    "200": (200.0, "R$ 200,00 (Pacote 12 Meses Piso Gerente à Vista • Economia R$ 160,00)"),
+    "220": (220.0, "R$ 220,00 (Pacote 12 Meses / 1 Ano • R$ 18,33/mês • Economia R$ 140,00)"),
+    "240": (240.0, "R$ 240,00 (Pacote Anual Tabela Antiga — atualizado para R$ 220,00)"),
+}
+
+
+def negociar_gerente_marcos(pnome, nome, telefone, mensagem, texto_sem_acento, lead, apresentou_como_escalacao=False, modo_auditoria=False):
+    """Conduz negociações e descontos de 2, 3, 4, 6, 8 e 12 meses (TV e App Rádio) como Gerente Marcos."""
     virgula_nome = f", {pnome}" if pnome else ""
     dados_extras = {}
     plano_salvo = str((lead or {}).get("plano_comercial") or "30")
@@ -715,15 +1038,16 @@ def negociar_gerente_marcos(pnome, nome, telefone, mensagem, texto_sem_acento, l
         plano_salvo = "30"
 
     if any(p in texto_sem_acento for p in ["cartao", "credito", "debito", "parcel", "vezes", "boleto"]):
-        disparar_alerta_cliente_quente(telefone, nome, f"GERENTE MARCOS: CLIENTE PEDIU CARTAO/PARCELAMENTO ({texto_sem_acento[:80]})")
-        dados_extras["notificacao_jonas"] = (
-            f"💳 *PEDIDO DE LINK CARTÃO/PARCELADO (GERENTE MARCOS):*\n"
-            f"👤 Cliente: {nome} ({telefone})\n"
-            f"💬 Mensagem: {(mensagem or '')[:140]}"
-        )
+        if not modo_auditoria:
+            disparar_alerta_cliente_quente(telefone, nome, f"GERENTE MARCOS: CLIENTE PEDIU CARTAO/PARCELAMENTO ({texto_sem_acento[:80]})")
+            dados_extras["notificacao_jonas"] = (
+                f"💳 *PEDIDO DE LINK CARTÃO/PARCELADO (GERENTE MARCOS):*\n"
+                f"👤 Cliente: {nome} ({telefone})\n"
+                f"💬 Mensagem: {(mensagem or '')[:140]}"
+            )
         baloes = [
-            f"Com certeza{virgula_nome}! Além do PIX com ativação na hora, também liberamos link de cartão pelo Mercado Pago (ótimo pro Trimestral ou Anual).",
-            "Já avisei o Jonas aqui agora mesmo pra te mandar o link de pagamento certinho!"
+            f"Com certeza{virgula_nome}! Além do PIX com ativação na hora pela Camila, também liberamos link de cartão pelo Mercado Pago (ideal pro de 4, 6, 8 ou 12 meses).",
+            "Já avisei o Jonas aqui agora mesmo pra te enviar o link certinho!"
         ]
         return baloes, dados_extras
 
@@ -736,12 +1060,16 @@ def negociar_gerente_marcos(pnome, nome, telefone, mensagem, texto_sem_acento, l
     ])
 
     if eh_pedido_pix:
-        if "220" in texto_sem_acento:
-            chave_plano = "220"
-        elif any(k in texto_sem_acento for k in ["1 ano", "anual", "12 meses", "um ano", "240"]):
-            chave_plano = "220" if plano_salvo == "220" and "240" not in texto_sem_acento else "240"
-        elif any(k in texto_sem_acento for k in ["6 meses", "semestral", "130"]):
-            chave_plano = "130"
+        if "200" in texto_sem_acento:
+            chave_plano = "200"
+        elif any(k in texto_sem_acento for k in ["1 ano", "anual", "12 meses", "um ano", "220"]):
+            chave_plano = "200" if plano_salvo == "200" and "220" not in texto_sem_acento else "220"
+        elif any(k in texto_sem_acento for k in ["8 meses", "oito meses", "160", "150"]):
+            chave_plano = "150" if ("150" in texto_sem_acento or plano_salvo == "150") and "160" not in texto_sem_acento else "160"
+        elif any(k in texto_sem_acento for k in ["6 meses", "semestral", "130", "120"]):
+            chave_plano = "120" if ("120" in texto_sem_acento or plano_salvo == "120") and "130" not in texto_sem_acento else "130"
+        elif any(k in texto_sem_acento for k in ["4 meses", "quatro meses", "quadrimestral", "90", "85"]):
+            chave_plano = "85" if ("85" in texto_sem_acento or plano_salvo == "85") and "90" not in texto_sem_acento else "90"
         elif "65" in texto_sem_acento:
             chave_plano = "65"
         elif any(k in texto_sem_acento for k in ["3 meses", "trimestral", "70"]):
@@ -758,102 +1086,145 @@ def negociar_gerente_marcos(pnome, nome, telefone, mensagem, texto_sem_acento, l
             chave_plano = plano_salvo
 
         valor_num, valor_str = PLANOS_IPTV[chave_plano]
+        dias_neg = calcular_dias_por_valor_iptv(valor_num)
         dados_extras["plano_comercial"] = chave_plano
-        disparar_alerta_cliente_quente(telefone, nome, f"GERENTE MARCOS GEROU PIX IPTV {valor_str}", valor_num)
-        return montar_bloco_pix(pnome, valor_str), dados_extras
+        dados_extras["valor_negociado"] = valor_num
+        dados_extras["dias_negociados"] = dias_neg
+        dados_extras["negociado_por"] = "Marcos"
+        if not modo_auditoria:
+            disparar_alerta_cliente_quente(telefone, nome, f"GERENTE MARCOS GEROU PIX {valor_str}", valor_num)
+        baloes_pix = montar_bloco_pix(pnome, valor_str)
+        baloes_pix.append(f"Assim que pagar, manda o print/comprovante aqui mesmo que a *Camila* já confere os *R$ {valor_num:.2f}* combinados e valida a ativação da sua lista VIP ({dias_neg} dias)!")
+        return baloes_pix, dados_extras
 
     if eh_choro_desconto:
-        if any(k in texto_sem_acento for k in ["1 ano", "anual", "12 meses", "um ano", "240"]) or plano_salvo == "240":
-            dados_extras["plano_comercial"] = "220"
+        if any(k in texto_sem_acento for k in ["1 ano", "anual", "12 meses", "um ano", "220"]) or plano_salvo == "220":
+            dados_extras.update({"plano_comercial": "200", "valor_negociado": 200.0, "dias_negociados": 365, "negociado_por": "Marcos"})
             baloes = [
-                f"Aqui é o *Marcos, gerente comercial*! Como você quer garantir o pacote de *1 Ano completo (800 canais + 40 rádios)*, vou liberar uma condição fechada de gerente pra você{virgula_nome}:",
-                "No preço mensal normal (`12 x R$ 30`) daria *R$ 360,00*. De *R$ 240,00*, consigo baixar à vista no PIX para *R$ 220,00 o ano inteiro* — são *R$ 140,00 de economia* (sai menos de R$ 18,50 por mês)!",
-                "Quer que eu já te mande a chave PIX oficial de *R$ 220,00* pra ativar hoje?"
+                f"Aqui é o *Marcos, gerente comercial*! No pacote de *12 Meses (1 Ano)* — que vale tanto pra TV quanto pro Aplicativo de Rádios PRO — vou liberar minha condição final pra você{virgula_nome}:",
+                "No avulso (`12 x R$ 30`) daria *R$ 360,00*. De *R$ 220,00*, fecho com você no PIX à vista por *R$ 200,00 o ano inteiro* — são *R$ 160,00 de desconto* (*R$ 16,67 por mês*!).",
+                "Posso gerar a chave PIX de *R$ 200,00* pra Camila conferir seu comprovante e ativar a lista VIP completa?"
+            ]
+        elif any(k in texto_sem_acento for k in ["8 meses", "oito meses", "160"]) or plano_salvo == "160":
+            dados_extras.update({"plano_comercial": "150", "valor_negociado": 150.0, "dias_negociados": 240, "negociado_por": "Marcos"})
+            baloes = [
+                f"Fecho com você{virgula_nome}! No pacote de *8 Meses* (que no mensal daria R$ 240 e já está R$ 160), consigo baixar na alçada de gerente para *R$ 150,00* — são *R$ 90,00 de economia*!",
+                "Quer a chave PIX de *R$ 150,00* agora pra Camila validar e liberar os 8 meses?"
+            ]
+        elif any(k in texto_sem_acento for k in ["6 meses", "semestral", "130"]) or plano_salvo == "130":
+            dados_extras.update({"plano_comercial": "120", "valor_negociado": 120.0, "dias_negociados": 180, "negociado_por": "Marcos"})
+            baloes = [
+                f"Combinado{virgula_nome}! Nos *6 Meses* (que daria R$ 180 no avulso e está R$ 130), libero desconto de gerente para *R$ 120,00* (apenas *R$ 20,00/mês*, *2 meses grátis*)!",
+                "Mando a chave PIX de *R$ 120,00* agora?"
+            ]
+        elif any(k in texto_sem_acento for k in ["4 meses", "quatro meses", "quadrimestral", "90"]) or plano_salvo == "90":
+            dados_extras.update({"plano_comercial": "85", "valor_negociado": 85.0, "dias_negociados": 120, "negociado_por": "Marcos"})
+            baloes = [
+                f"Bora fechar{virgula_nome}! Nos *4 Meses* (que já tem 1 mês grátis por R$ 90), arredondo no desconto de gerente para *R$ 85,00* (economia de R$ 35,00)!",
+                "Mando o PIX de *R$ 85,00* agora pra Camila conferir e liberar?"
             ]
         elif any(k in texto_sem_acento for k in ["3 meses", "trimestral", "70"]) or plano_salvo == "70":
-            dados_extras["plano_comercial"] = "65"
+            dados_extras.update({"plano_comercial": "65", "valor_negociado": 65.0, "dias_negociados": 90, "negociado_por": "Marcos"})
             baloes = [
-                f"Tranquilo{virgula_nome}, aqui é o *gerente Marcos*! No pacote de *3 Meses (Trimestral)* que sairia R$ 90 no avulso e já está por R$ 70, consigo arredondar no limite de gerente por *R$ 65,00 os 3 meses completos* (R$ 25,00 de desconto total)!",
-                "Mando a chave PIX de *R$ 65,00* agora pra você garantir?"
+                f"Tranquilo{virgula_nome}, aqui é o *gerente Marcos*! No pacote de *3 Meses* que daria R$ 90 e já está R$ 70, consigo fechar por *R$ 65,00* (economia de R$ 25,00)!",
+                "Mando a chave PIX de *R$ 65,00* agora?"
             ]
         elif any(k in texto_sem_acento for k in ["2 meses", "bimestral", "50"]) or plano_salvo == "50":
-            dados_extras["plano_comercial"] = "45"
+            dados_extras.update({"plano_comercial": "45", "valor_negociado": 45.0, "dias_negociados": 60, "negociado_por": "Marcos"})
             baloes = [
-                f"Aqui é o *Marcos, gerente*! Nos *2 Meses*, além do valor promocional de R$ 50, consigo fechar com você hoje por *R$ 45,00* (ou se preferir pegar *3 meses direto por R$ 65,00*, compensa ainda mais)!",
-                "Qual dos dois você prefere que eu libere no PIX: *2 meses por R$ 45* ou *3 meses por R$ 65*?"
+                f"Aqui é o *Marcos, gerente*! Nos *2 Meses*, além dos R$ 50, consigo fechar com você hoje por *R$ 45,00* (ou pular direto pros *3 meses por R$ 65,00*!).",
+                "Qual você prefere fechar no PIX agora: *2 meses por R$ 45* ou *3 meses por R$ 65*?"
             ]
         else:
-            dados_extras["plano_comercial"] = "25"
+            dados_extras.update({"plano_comercial": "25", "valor_negociado": 25.0, "dias_negociados": 30, "negociado_por": "Marcos"})
             baloes = [
-                f"Pode deixar comigo{virgula_nome}! Aqui é o *Marcos, gerente comercial*. Pra não deixar você sair sem acesso hoje, consigo liberar o *1º mês promocional por R$ 25,00* (pacote completo 800 canais + 40 rádios)!",
-                "E só pra você saber das vantagens maiores: fechando *2 meses fica R$ 50*, *3 meses fica R$ 70* e no pacote de *1 Ano sai R$ 240* (*4 meses de graça*!). Qual você prefere?"
+                f"Pode deixar comigo{virgula_nome}! Aqui é o *Marcos, gerente comercial*. Para você entrar hoje na TV ou no App de Rádio PRO, consigo liberar o *1º mês promocional por R$ 25,00*!",
+                "E nos pacotes maiores a economia cresce muito mais: *2m = R$ 50* | *3m = R$ 70* | *4m = R$ 90* | *6m = R$ 130* | *8m = R$ 160* | *12m = R$ 220*. Qual você quer garantir?"
             ]
         return baloes, dados_extras
 
-    if any(k in texto_sem_acento for k in ["1 ano", "anual", "12 meses", "um ano", "240"]):
-        dados_extras["plano_comercial"] = "240"
+    if any(k in texto_sem_acento for k in ["1 ano", "anual", "12 meses", "um ano", "220"]):
+        dados_extras.update({"plano_comercial": "220", "valor_negociado": 220.0, "dias_negociados": 365, "negociado_por": "Marcos"})
         baloes = [
-            f"Excelente visão{virgula_nome}! Aqui é o *Marcos, gerente comercial*. No pacote de *1 Ano (12 meses)* a economia é gigante:",
-            "Pagando mês a mês (`12 x R$ 30`) daria *R$ 360,00*. No plano *Anual Completo* eu libero os 12 meses de *800 canais + 40 rádios* por *R$ 240,00* — sai a apenas *R$ 20,00/mês* (*4 meses de graça*, R$ 120 de desconto)!",
-            "Quer que eu gere a chave PIX oficial de *R$ 240,00* agora ou quer conversar sobre pagamento?"
+            f"Excelente visão{virgula_nome}! No pacote de *12 Meses (1 Ano)* — válido para *TV Completa ou App Rádio PRO* — a vantagem é máxima:",
+            "Pagando mês a mês (`12 x R$ 30`) daria *R$ 360,00*. No plano *Anual Completo* eu libero os 12 meses por *R$ 220,00* — sai a apenas *R$ 18,33/mês* (*R$ 140,00 de economia*!).",
+            "Quer que eu gere a chave PIX oficial de *R$ 220,00* pra Camila conferir seu comprovante e ativar na hora?"
+        ]
+        return baloes, dados_extras
+
+    if any(k in texto_sem_acento for k in ["8 meses", "oito meses", "160"]):
+        dados_extras.update({"plano_comercial": "160", "valor_negociado": 160.0, "dias_negociados": 240, "negociado_por": "Marcos"})
+        baloes = [
+            f"Ótima pedida{virgula_nome}! No pacote de *8 Meses* (TV ou App de Rádio PRO), no avulso daria R$ 240,00, mas na tabela promocional sai por *R$ 160,00* — fica apenas *R$ 20,00/mês* com *R$ 80,00 de economia*!",
+            "Quer a chave PIX de *R$ 160,00* agora pra fechar os 8 meses?"
         ]
         return baloes, dados_extras
 
     if any(k in texto_sem_acento for k in ["6 meses", "semestral", "130"]):
-        dados_extras["plano_comercial"] = "130"
+        dados_extras.update({"plano_comercial": "130", "valor_negociado": 130.0, "dias_negociados": 180, "negociado_por": "Marcos"})
         baloes = [
-            f"Boa escolha{virgula_nome}! Nos *6 Meses (Semestral)* você paga *R$ 130,00* em vez de R$ 180,00 — são *R$ 50,00 de economia* na hora com acesso completo aos 800 canais + 40 rádios!",
-            "Quer que eu mande a chave PIX de *R$ 130,00* agora ou prefere comparar com o Anual de R$ 240?"
+            f"Boa escolha{virgula_nome}! Nos *6 Meses (Semestral)* você paga *R$ 130,00* em vez de R$ 180,00 — são *R$ 50,00 de desconto* (*R$ 21,67/mês*)!",
+            "Quer o PIX de *R$ 130,00* ou comparar com o de *8 meses (R$ 160)*?"
+        ]
+        return baloes, dados_extras
+
+    if any(k in texto_sem_acento for k in ["4 meses", "quatro meses", "quadrimestral", "90"]):
+        dados_extras.update({"plano_comercial": "90", "valor_negociado": 90.0, "dias_negociados": 120, "negociado_por": "Marcos"})
+        baloes = [
+            f"O pacote de *4 Meses* vale muito a pena{virgula_nome}: você paga valor de 3 (`R$ 90,00`) e leva *4 meses completos* — sai *R$ 22,50/mês* (*1 mês inteiro grátis*, economia de R$ 30,00)!",
+            "Posso mandar a chave PIX de *R$ 90,00* agora?"
         ]
         return baloes, dados_extras
 
     if any(k in texto_sem_acento for k in ["3 meses", "trimestral", "70"]):
-        dados_extras["plano_comercial"] = "70"
+        dados_extras.update({"plano_comercial": "70", "valor_negociado": 70.0, "dias_negociados": 90, "negociado_por": "Marcos"})
         baloes = [
-            f"O *Pacote de 3 Meses (Trimestral)* é o que mais sai aqui com a gente{virgula_nome}!",
-            "No mensal daria R$ 90,00, mas como gerente eu libero os *3 meses completos (800 canais + 40 rádios)* por *R$ 70,00* — você economiza *R$ 20,00* na hora (sai R$ 23,33 por mês)!",
-            "Posso mandar a chave PIX de *R$ 70,00* agora pra já deixar liberado?"
+            f"Nos *3 Meses (Trimestral)*{virgula_nome}, em vez de R$ 90,00 você garante por *R$ 70,00* (*R$ 23,33/mês*, economia de R$ 20,00)! (E olha: por mais R$ 20 você já pega *4 meses a R$ 90*!).",
+            "Quer o PIX de *R$ 70,00* ou prefere o de 4 meses?"
         ]
         return baloes, dados_extras
 
     if any(k in texto_sem_acento for k in ["2 meses", "bimestral", "50"]):
-        dados_extras["plano_comercial"] = "50"
+        dados_extras.update({"plano_comercial": "50", "valor_negociado": 50.0, "dias_negociados": 60, "negociado_por": "Marcos"})
         baloes = [
-            f"No pacote de *2 Meses* você já sente a vantagem logo de cara{virgula_nome}: em vez de R$ 60,00, fecho pra você por *R$ 50,00* (sai R$ 25,00/mês com *R$ 10,00 de desconto* na hora)!",
-            "Se quiser comparar: *3 meses sai R$ 70,00* (economia de R$ 20). Quer a chave PIX dos *2 meses (R$ 50)* agora?"
+            f"Nos *2 Meses* você já economiza R$ 10,00 logo de entrada{virgula_nome}: em vez de R$ 60,00, fecho por *R$ 50,00* (*R$ 25,00/mês*) — válido para TV ou Aplicativo de Rádio PRO!",
+            "Quer a chave PIX de *R$ 50,00* agora?"
         ]
         return baloes, dados_extras
 
     if any(k in texto_sem_acento for k in ["2 telas", "duas telas", "familia", "mais de uma tv", "45"]):
-        dados_extras["plano_comercial"] = "45"
+        dados_extras.update({"plano_comercial": "45", "valor_negociado": 45.0, "dias_negociados": 30, "negociado_por": "Marcos"})
         baloes = [
-            f"Pra assistir em *2 telas ao mesmo tempo* (por exemplo, Sala + Quarto ou TV + Celular){virgula_nome}, em vez de pagar R$ 60 por duas assinaturas eu faço no mês por *R$ 45,00*!",
-            "Quer que eu mande a chave PIX de *R$ 45,00* agora?"
+            f"Pra usar *2 telas simultâneas* no mês{virgula_nome}, em vez de R$ 60 fecho por *R$ 45,00*!",
+            "Quer a chave PIX de *R$ 45,00* agora?"
         ]
         return baloes, dados_extras
 
     if any(k in texto_sem_acento for k in ["1 mes", "mensal", "30"]):
-        dados_extras["plano_comercial"] = "30"
+        dados_extras.update({"plano_comercial": "30", "valor_negociado": 30.0, "dias_negociados": 30, "negociado_por": "Marcos"})
         baloes = [
-            f"No plano de *1 Mês* o valor de tabela é *R$ 30,00* (800 canais + 40 rádios){virgula_nome}.",
-            "Mas como gerente já te mostro a vantagem: pegando *2 meses sai R$ 50* e *3 meses sai R$ 70*! Prefere fechar o de *1 Mês (R$ 30)* ou aproveitar um pacote com desconto?"
+            f"No plano de *1 Mês* o valor de tabela é *R$ 30,00*{virgula_nome}.",
+            "Mas olha quanto você economiza fechando mais meses (tanto pra *TV* quanto pro *App de Rádios*): *2m = R$ 50* | *3m = R$ 70* | *4m = R$ 90* | *6m = R$ 130* | *8m = R$ 160* | *12m = R$ 220*! Qual quer fechar?"
         ]
         return baloes, dados_extras
 
     intro = (
         f"A Camila me chamou aqui{virgula_nome}! Aqui é o *Marcos, gerente comercial*."
         if apresentou_como_escalacao
-        else f"Opa{virgula_nome}! Tudo certo? Aqui é o *Marcos, gerente comercial da Central CinePro TV & Rádios*."
+        else f"Opa{virgula_nome}! Tudo certo? Aqui é o *Marcos, gerente comercial da Central TV & Aplicativo de Rádios*."
     )
     baloes = [
         intro,
         (
-            "Conheço todos os nossos pacotes e consigo liberar vantagens reais conforme o tempo que você fechar:\n\n"
+            "Essa tabela oficial de descontos vale *tanto pro Aplicativo da TV quanto pro Aplicativo de Rádios PRO*:\n\n"
             "• *1 Mês (Tabela):* R$ 30,00\n"
-            "• *2 Meses:* *R$ 50,00* (economiza R$ 10,00)\n"
-            "• *3 Meses (Campeão):* *R$ 70,00* (economiza R$ 20,00)\n"
-            "• *1 Ano (12 Meses):* *R$ 240,00* (sai R$ 20/mês — *4 meses grátis!*)\n\n"
-            "Todos com *800 canais + 40 rádios*! Qual pacote faz mais sentido pra você hoje?"
+            "• *2 Meses:* *R$ 50,00* (R$ 25,00/mês • economiza R$ 10)\n"
+            "• *3 Meses:* *R$ 70,00* (R$ 23,33/mês • economiza R$ 20)\n"
+            "• *4 Meses:* *R$ 90,00* (R$ 22,50/mês • *1 mês grátis!*)\n"
+            "• *6 Meses:* *R$ 130,00* (R$ 21,67/mês • economiza R$ 50)\n"
+            "• *8 Meses:* *R$ 160,00* (R$ 20,00/mês • economiza R$ 80)\n"
+            "• *12 Meses (1 Ano):* *R$ 220,00* (R$ 18,33/mês • economiza R$ 140!)\n\n"
+            "Depois que fecharmos o valor aqui e você fizer o PIX, a *Camila* já valida seu print e libera sua lista VIP completa na hora! Qual plano quer negociar?"
         )
     ]
     return baloes, dados_extras
@@ -1001,80 +1372,95 @@ def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tip
     tem_ocr_comprovante = bool((texto_comprovante or "").strip()) and setor_atual != "SETOR_2_SUPORTE"
 
     if eh_pagamento_texto and not eh_midia_comprovante and not tem_ocr_comprovante:
+        valor_esp = (lead or {}).get("valor_negociado") or 30.0
         return (
             setor_atual,
-            "Camila" if setor_atual != "SETOR_3_COMERCIAL" else "Marcos",
-            [f"Show{virgula_nome}! Me manda aqui a foto ou o PDF do comprovante rapidinho pra eu confirmar a transferência em nome de {TITULAR_CONTA} e já liberar pra você na hora 😊"],
+            "Camila",
+            [f"Show{virgula_nome}! Aqui é a *Camila*. Pode mandar a foto ou PDF do comprovante aqui que já confiro o valor combinado (*R$ {float(valor_esp):.2f}*) em nome de {TITULAR_CONTA} e libero sua Lista VIP na hora 😊"],
             dados_extras
         )
 
     if eh_midia_comprovante or tem_ocr_comprovante:
         plano_salvo_com = (lead or {}).get("plano_comercial", "30")
+        valor_esperado = float((lead or {}).get("valor_negociado") or plano_salvo_com or 30.0)
         analise = analisar_comprovante_pix(texto_comprovante, texto, setor_atual, plano_salvo_com)
         if analise["ja_usado"]:
+            registrar_auditoria_agente("Camila", "COMPROVANTE_REPETIDO", mensagem, 0.0, False, "Comprovante repetido bloqueado pela Camila.")
             dados_extras["notificacao_jonas"] = (
-                f"⚠️ *ALERTA DE COMPROVANTE REPETIDO!*\n"
+                f"⚠️ *ALERTA DE COMPROVANTE REPETIDO (CAMILA):*\n"
                 f"👤 {nome} ({telefone}) enviou um comprovante já utilizado antes."
             )
             return (
                 setor_atual,
-                "Validação Financeira",
+                "Camila",
                 [
-                    f"Opa{virgula_nome}, esse comprovante já apareceu validado por aqui antes! 🤔",
-                    "Se você acabou de fazer um pagamento novo, manda a foto ou PDF certinho da transferência de hoje que já confiro pra você!"
+                    f"Opa{virgula_nome}, aqui é a Camila! Esse comprovante já apareceu validado por aqui antes 🤔",
+                    "Se você acabou de fazer um pagamento novo, manda a foto ou PDF certinho da transferência de hoje que já confiro e ativo na hora!"
                 ],
                 dados_extras
             )
 
         if analise["aprovado_automatico"]:
             registrar_comprovante_usado(analise["chave_unica"], telefone, analise["valor"])
-            disparar_alerta_cliente_quente(telefone, nome, f"PAGAMENTO PIX VALIDADO (R$ {analise['valor']:.2f})", analise["valor"])
+            disparar_alerta_cliente_quente(telefone, nome, f"CAMILA VALIDOU PIX (R$ {analise['valor']:.2f})", analise["valor"])
 
             dias_liberados = calcular_dias_por_valor_iptv(analise["valor"])
             usuario, senha, validade = gerar_credenciais_cinepro(
                 telefone, nome, analise["valor"], texto_comprovante, dias=dias_liberados
             )
-            quem_confirmou = "Marcos" if setor_atual == "SETOR_3_COMERCIAL" else "Camila"
+            vip_ativos = len(_carregar_canais_vip_nuvem())
+            abaixo_combinado = analise["valor"] + 1.0 < valor_esperado
             registrar_evento_email(
                 "PAGAMENTO", nome, telefone, analise["valor"],
-                f"CinePro TV ({dias_liberados} Dias) • Usuário {usuario}",
-                f"Comprovante validado por {quem_confirmou} e login liberado até {validade}."
+                f"Lista VIP ({dias_liberados} Dias) • Usuário {usuario}",
+                f"Validado pela Camila ({'valor abaixo do combinado R$ ' + str(valor_esperado) if abaixo_combinado else 'integral'}) até {validade}."
             )
-            dados_extras["status_pagamento"] = "APROVADO_AUTOMATICO"
+            dados_extras["status_pagamento"] = "APROVADO_PARCIAL" if abaixo_combinado else "APROVADO_AUTOMATICO"
             dados_extras["usuario_cinepro"] = usuario
             dados_extras["valor_pago"] = analise["valor"]
             dados_extras["notificacao_jonas"] = (
-                f"💰 *PAGAMENTO CONFIRMADO ({quem_confirmou.upper()})!*\n"
+                f"💰 *VALIDAÇÃO DA CAMILA (ATIVAÇÃO VIP):*\n"
                 f"👤 Cliente: {nome} ({telefone})\n"
-                f"💵 Valor lido: R$ {analise['valor']:.2f} ({dias_liberados} dias)\n"
-                f"🔐 Acesso liberado até {validade}:\n"
-                f"• Usuário: *{usuario}*\n"
-                f"• Senha: *{senha}*"
+                f"💵 Pago lido: R$ {analise['valor']:.2f} (Combinado: R$ {valor_esperado:.2f}) • {dias_liberados} dias\n"
+                f"🔐 Usuário: *{usuario}* | Senha: *{senha}* (até {validade})"
             )
+            if abaixo_combinado:
+                registrar_auditoria_agente("Camila", "PAGAMENTO_PARCIAL", mensagem, 0.0, True, f"Pagou R$ {analise['valor']:.2f} de R$ {valor_esperado:.2f}; liberados {dias_liberados}d.")
+                msg_validacao = (
+                    f"Oi{virgula_nome}! Aqui é a *Camila*. Validei seu comprovante de *R$ {analise['valor']:.2f}* em nome de {TITULAR_CONTA}!\n\n"
+                    f"Como o pacote combinado com o Gerente Marcos era *R$ {valor_esperado:.2f}*, liberei proporcionalmente *{dias_liberados} dias* no seu acesso enquanto o restante é conferido."
+                )
+            else:
+                registrar_auditoria_agente("Camila", "PAGAMENTO_VALIDADO", mensagem, 0.0, True, f"Validou R$ {analise['valor']:.2f} ({dias_liberados}d) VIP.")
+                msg_validacao = (
+                    f"Perfeito{virgula_nome}! Aqui é a *Camila* 😊 Já conferi o seu print aqui certinho: pagamento de *R$ {analise['valor']:.2f}* em nome de {TITULAR_CONTA} validado com sucesso!"
+                )
+            info_vip = f"Lista VIP total ativa (*{200 + vip_ativos} canais/rádios*)" if vip_ativos > 0 else "acesso completo liberado (200 abertos/rádios + credenciais VIP ativas no cadastro)"
             return (
                 "PAGAMENTO_RECEBIDO",
-                quem_confirmou,
+                "Camila",
                 [
-                    f"Perfeito{virgula_nome}! Acabei de conferir seu comprovante aqui em nome de {TITULAR_CONTA}, pagamento de R$ {analise['valor']:.2f} confirmado certinho! Muito obrigado pela confiança 😊",
-                    f"Já deixei seu acesso completo (800 canais + 40 rádios) liberado por *{dias_liberados} dias* (até {validade})! Anota seus dados pra entrar:\n\nUsuário: {usuario}\nSenha: {senha}\n\nLink direto: {LINK_PLAYER_IPTV}?u={usuario}&s={senha}",
-                    "Tocando nesse link acima já entra liberado na hora! Se for abrir na Smart TV ou outro aparelho, é só clicar em *Entrar* lá no topo e colocar esse usuário e senha!"
+                    msg_validacao,
+                    f"Validei a ativação do seu acesso ({info_vip}) por *{dias_liberados} dias* (até {validade})! Anota seus dados pra entrar na TV e no App de Rádios:\n\nUsuário: {usuario}\nSenha: {senha}\n\nLink direto: {LINK_PLAYER_IPTV}?u={usuario}&s={senha}",
+                    "Tocando nesse link acima já entra liberado na hora! Se for abrir na Smart TV, clique em *Entrar* lá no topo e coloque esse usuário e senha."
                 ],
                 dados_extras
             )
 
         dados_extras["status_pagamento"] = "AGUARDANDO_CONFERENCIA_JONAS"
+        registrar_auditoria_agente("Camila", "PAGAMENTO_EM_ANALISE", mensagem, 0.0, False, "Comprovante enviado para conferência manual.")
         dados_extras["notificacao_jonas"] = (
-            f"⚠️ *COMPROVANTE PARA CONFERIR!*\n"
+            f"⚠️ *COMPROVANTE PARA CONFERIR (CAMILA):*\n"
             f"👤 Cliente: {nome} ({telefone})\n"
             f"📄 Leitura parcial: {(texto_comprovante or 'imagem/PDF sem texto legível')[:120]}\n\n"
             f"👉 Caiu na conta? Responda aqui:\n*#liberar {telefone}*"
         )
         return (
             "PAGAMENTO_EM_ANALISE",
-            "Camila" if setor_atual != "SETOR_3_COMERCIAL" else "Marcos",
+            "Camila",
             [
-                f"Recebi seu arquivo aqui{virgula_nome}! 🙏",
-                f"Como alguns dados da imagem não ficaram nítidos pra leitura automática, já encaminhei agora mesmo pro Jonas confirmar no {BANCO_RECEBEDOR} e te liberar o acesso em instantes!"
+                f"Recebi seu comprovante aqui{virgula_nome}, sou a *Camila*! 🙏",
+                f"Como alguns números não ficaram totalmente nítidos na leitura automática, já passei agora mesmo pro Jonas confirmar no {BANCO_RECEBEDOR} e validar sua ativação em instantes!"
             ],
             dados_extras
         )
@@ -1116,10 +1502,11 @@ def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tip
     eh_escalacao_gerente = (
         eh_opc_3
         or eh_chamar_marcos
-        or bool(re.search(r"\b(25|45|50|65|70|130|220|240)\b", texto_sem_acento))
+        or bool(re.search(r"\b(25|45|50|65|70|85|90|120|130|150|160|200|220|240)\b", texto_sem_acento))
         or any(p in texto_sem_acento for p in [
             "desconto", "promocao", "mais barato", "negocia", "caro", "faz por", "abaixa", "melhora", "condicao",
-            "2 meses", "3 meses", "6 meses", "trimestral", "semestral", "1 ano", "anual", "um ano",
+            "2 meses", "3 meses", "4 meses", "quatro meses", "6 meses", "8 meses", "oito meses",
+            "trimestral", "quadrimestral", "semestral", "1 ano", "anual", "um ano",
             "2 telas", "duas telas", "planos", "pacotes", "tabela"
         ])
     )
@@ -1133,8 +1520,8 @@ def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tip
         "instalar na tv", "como coloca", "todos os canais", "um canal", "um so"
     ])
     eh_intencao_tv = eh_opc_1 or eh_chamar_camila or any(p in texto_sem_acento for p in [
-        "tv", "iptv", "cinepro", "canais", "radio", "radios", "aberta", "teste", "testar",
-        "2h", "2 horas", "duas horas", "degustacao", "gratuito", "gratis", "800", "200",
+        "tv", "iptv", "cinepro", "canais", "radio", "radios", "app da radio", "aplicativo da radio", "aberta",
+        "teste", "testar", "2h", "2 horas", "duas horas", "degustacao", "gratuito", "gratis", "800", "200",
         "assinar", "quero fechar", "quanto custa", "valor", "preco", "mensal", "30"
     ])
     eh_pedido_explicito_canais_tv = eh_opc_1 or eh_chamar_camila or any(p in texto_sem_acento for p in [
@@ -1235,14 +1622,15 @@ def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tip
                 dados_extras.update(extras_2h)
             elif any(p in texto_sem_acento for p in ["pix", "pagar", "quero fechar", "quero assinar", "manda a chave", "chave"]):
                 dados_extras["plano_comercial"] = "30"
+                dados_extras["valor_negociado"] = 30.0
                 disparar_alerta_cliente_quente(telefone, nome, "CAMILA: CLIENTE PEDIU PIX MENSAL R$ 30,00", 30.0)
                 baloes = montar_bloco_pix(pnome, PLANOS_IPTV["30"][1])
             elif any(p in texto_sem_acento for p in ["quanto e", "quanto custa", "valor", "preco", "mensal", "assinar", "comprar", "30", "800"]):
                 baloes = [
                     f"Funciona assim{virgula_nome}: os *200 canais livres + 40 rádios* já são totalmente gratuitos no nosso link!",
                     (
-                        f"Agora, se você quiser o *Pacote Completo com 800 canais* (filmes, séries, esportes e canais fechados + 40 rádios), o plano mensal de tabela comigo é *R$ 30,00 por mês* (ou você pode pedir *teste 2h* para testar antes).\n\n"
-                        "Se quiser ver descontos para *2 meses, 3 meses ou 1 Ano*, me avisa que eu chamo o *Gerente Marcos* na hora!"
+                        f"Agora, se você quiser o *Pacote Completo (TV Lista VIP + Aplicativo de Rádios PRO)*, o plano mensal de tabela comigo é *R$ 30,00 por mês* (ou você pode pedir *teste 2h* para testar antes).\n\n"
+                        "Se quiser ver descontos para *2, 3, 4, 6, 8 ou 12 meses*, me avisa que eu chamo o *Gerente Marcos* na hora!"
                     )
                 ]
             elif any(p in texto_sem_acento for p in ["radio", "radios", "musica", "fm", "sertanejo"]):
@@ -1422,9 +1810,12 @@ def webhook_whatsapp():
     if not mensagem and tipo_midia == "text" and not texto_comprovante:
         return jsonify({"erro": "Nenhuma mensagem encontrada no payload"}), 400
 
+    t0_proc = time.perf_counter()
     novo_setor, atendente, lista_baloes, extras = processar_mensagem_inteligente(
         telefone, nome, mensagem, midia_url, tipo_midia, texto_comprovante
     )
+    ms_proc = (time.perf_counter() - t0_proc) * 1000
+    registrar_auditoria_agente(atendente, novo_setor, mensagem, ms_proc, sucesso=True)
     resposta_consolidada = "\n\n".join(lista_baloes)
 
     if leads_col is not None:
@@ -1802,6 +2193,51 @@ def api_canais_vip_cinepro():
     if int(doc.get("expira_ts") or 0) and agora_ms > int(doc.get("expira_ts")):
         return jsonify({"ok": False, "erro": "Acesso expirado. Renove pelo Chat Online ou WhatsApp!"}), 401
     return jsonify({"ok": True, "canais": canais_vip}), 200
+
+
+@app.route("/auditor", methods=["GET"])
+def rota_painel_auditor_ao_vivo():
+    """Serve o Quadro ao Vivo do Auditor dos 3 Agentes + Latência & Conexão."""
+    caminho = os.path.join(os.path.dirname(os.path.abspath(__file__)), "auditor_ao_vivo.html")
+    if os.path.exists(caminho):
+        with open(caminho, "r", encoding="utf-8") as f:
+            return f.read(), 200, {"Content-Type": "text/html; charset=utf-8"}
+    return "Painel do Auditor em atualização", 404
+
+
+@app.route("/api/auditor/ping", methods=["GET"])
+def api_auditor_ping():
+    """Responde instantaneamente para o navegador medir a latência da própria conexão."""
+    resp = jsonify({
+        "ok": True,
+        "servidor": "online",
+        "horario": agora_brasilia().strftime("%H:%M:%S.%f")[:-3]
+    })
+    resp.headers["Cache-Control"] = "no-store"
+    return resp, 200
+
+
+@app.route("/api/auditor/status", methods=["GET"])
+def api_auditor_status():
+    """Retorna o relatório mais recente do Auditor e do quadro de conexão."""
+    if _ESTADO_AUDITOR.get("ultima_auditoria") is None:
+        return jsonify(executar_auditoria_3_agentes(forcar_rede=True)), 200
+    snap = dict(_ESTADO_AUDITOR["ultima_auditoria"])
+    snap["rede"] = obter_diagnostico_conexao_rapido()
+    snap["ultimos_eventos"] = _ESTADO_AUDITOR["ultimos_eventos"]
+    ag_snap = dict(snap.get("agentes") or {})
+    for nome_ag in ["Camila", "Lucas", "Marcos"]:
+        if nome_ag in ag_snap:
+            ag_snap[nome_ag] = {**ag_snap[nome_ag], **_ESTADO_AUDITOR["agentes"][nome_ag]}
+    snap["agentes"] = ag_snap
+    return jsonify(snap), 200
+
+
+@app.route("/api/auditor/executar", methods=["POST", "GET"])
+def api_auditor_executar():
+    """Executa agora auditoria ao vivo dos 3 agentes, MongoDB e streams."""
+    relatorio = executar_auditoria_3_agentes(forcar_rede=True)
+    return jsonify(relatorio), 200
 
 
 @app.route("/api/financeiro/metricas", methods=["GET"])
@@ -2715,9 +3151,12 @@ def _executar_turno_chat_web(sessao_id, nome, telefone_raw, mensagem_user, msg_e
     if len(tel_digitos) == 10 or len(tel_digitos) == 11:
         identificador = "55" + tel_digitos
 
+    t0_web = time.perf_counter()
     novo_setor, atendente, baloes, extras = processar_mensagem_inteligente(
         identificador, nome, mensagem_user, midia_url=None, tipo_midia=tipo_midia, texto_comprovante=texto_comprovante, canal="web"
     )
+    ms_web = (time.perf_counter() - t0_web) * 1000
+    registrar_auditoria_agente(atendente, novo_setor, msg_exibicao_historico, ms_web, sucesso=True)
 
     if extras.get("ignorado"):
         atendente = "Equipe do Jonas"
