@@ -401,12 +401,61 @@ def diagnosticar_suporte_lucas(pnome, nome, telefone, mensagem, tipo_midia, text
         ]
         return baloes, notificacao
 
-    # 1. Como colocar / instalar / abrir na Smart TV ou TV Box
+    # 1. Computador / Windows / PDV / Impressora (prioridade sobre sintomas genéricos de TV)
+    if any(p in texto_ascii for p in ["pc", "computador", "notebook", "windows", "formatar", "pdv", "caixa", "impressora", "leitor"]):
+        registrar_evento_email(
+            "SUPORTE_TECNICO", nome, telefone, 0.0,
+            mensagem[:180],
+            "Triagem técnica iniciada para Windows / Sistema PDV Caixa (impressora, leitor ou desempenho)."
+        )
+        baloes = [
+            f"Tranquilo{virgula_nome}, vamos resolver isso no computador/PDV agora!",
+            (
+                "1️⃣ Se for no *Sistema PDV Caixa*, aperte *F5* para atualizar a tela e confira se o cabo USB da impressora/leitor está firme.\n"
+                "2️⃣ Se for *lentidão ou erro no Windows*, me conta o que travou ou manda uma foto da tela aqui que eu te passo a correção certeira!"
+            )
+        ]
+        return baloes, notificacao
+
+    # 2. Marca ou aparelho específico da TV já informado (evita repetir pergunta da marca)
+    if "roku" in texto_ascii:
+        registrar_evento_email(
+            "SUPORTE_TECNICO", nome, telefone, 0.0,
+            mensagem[:180],
+            "Orientação específica enviada para Roku TV (espelhamento do celular)."
+        )
+        baloes = [
+            f"Perfeito{virgula_nome}! Na *Roku TV* o sistema não traz navegador aberto para digitar links direto na televisão.",
+            (
+                f"O jeito mais rápido de assistir na Roku é abrir o link no seu celular ({LINK_PLAYER_IPTV}) "
+                "e usar a função *Transmitir / Espelhar Tela* (Smart View, Transmitir ou AirPlay) jogando a imagem para a TV."
+            ),
+            "Se quiser testar espelhando agora, me avisa aqui se conectou certinho!"
+        ]
+        return baloes, notificacao
+
+    if any(p in texto_ascii for p in ["samsung", "lg", "tcl", "philco", "aoc", "tv box", "chromecast", "fire", "android tv"]):
+        registrar_evento_email(
+            "SUPORTE_TECNICO", nome, telefone, 0.0,
+            mensagem[:180],
+            "Orientação específica enviada para Smart TV / TV Box pelo navegador."
+        )
+        baloes = [
+            f"Show{virgula_nome}! Para esse modelo de TV/aparelho é bem direto:",
+            (
+                "1️⃣ Abra o aplicativo *Internet / Navegador / Browser* na sua TV (ou *Chrome / Downloader* na TV Box).\n"
+                f"2️⃣ Digite exatamente esse endereço na barra lá em cima:\n{LINK_PLAYER_IPTV}\n"
+                "3️⃣ Depois salve nos *Favoritos* da TV para abrir com 1 clique sempre que quiser."
+            ),
+            "Se aparecer algum aviso na tela da TV, manda uma foto por aqui que te ajudo na hora!"
+        ]
+        return baloes, notificacao
+
+    # 3. Como colocar / instalar / abrir na Smart TV ou TV Box (pedido genérico sem marca)
     if any(p in texto_ascii for p in [
         "colocar na tv", "coloca na tv", "botar na tv", "bota na tv", "por na tv",
         "instalar na tv", "instala na tv", "assistir na tv", "ver na tv", "abrir na tv",
-        "como coloca", "samsung", "lg", "roku", "tcl", "philco", "aoc", "tv box",
-        "box", "fire", "android tv", "chromecast", "espelhar", "smart"
+        "como coloca", "box", "espelhar", "smart"
     ]):
         registrar_evento_email(
             "SUPORTE_TECNICO", nome, telefone, 0.0,
@@ -423,12 +472,26 @@ def diagnosticar_suporte_lucas(pnome, nome, telefone, mensagem, tipo_midia, text
         ]
         return baloes, notificacao
 
-    # 2. TV ou canal parou de funcionar / travou / não abre / sem sinal
+    # 4. Acompanhamento quando o cliente responde o diagnóstico da TV sem repetir tudo
+    if ja_atendeu_antes and any(p in texto_ascii for p in ["todos os canais", "em todos", "um canal", "um so", "so um", "apenas um"]):
+        if any(p in texto_ascii for p in ["um canal", "um so", "so um", "apenas um"]):
+            baloes = [
+                f"Entendi{virgula_nome}! Quando falha em *um canal específico*, geralmente a emissora pública está oscilando a transmissão naquele momento.",
+                "Testa outro canal vizinho na lista e me diz *qual canal* parou para eu verificar o sinal dele aqui na central!"
+            ]
+        else:
+            baloes = [
+                f"Certo{virgula_nome}! Quando para em *todos os canais* ao mesmo tempo, normalmente é conexão DNS/Wi-Fi ou bloqueio do navegador da TV.",
+                "Confere se o site abre normal no navegador do celular no Wi-Fi. Se no celular abrir e na TV não, me manda uma foto da tela da TV aqui que resolvo com você!"
+            ]
+        return baloes, notificacao
+
+    # 5. TV ou canal parou de funcionar / travou / não abre / sem sinal
     if any(p in texto_ascii for p in [
-        "parou", "nao funciona", "não funciona", "nao pega", "não pega",
-        "nao entra", "não entra", "nao carrega", "não carrega", "travou", "travado",
+        "parou", "nao funciona", "nao pega",
+        "nao entra", "nao carrega", "travou", "travado",
         "congelou", "caiu", "saiu do ar", "deu erro", "canal", "canais", "fora do ar",
-        "sem som", "mudo", "tela preta", "nao abre", "não abre", "0:00", "sumiu", "sinal"
+        "sem som", "mudo", "tela preta", "nao abre", "0:00", "sumiu", "sinal"
     ]):
         notificacao = f"🛠️ *CHAMADO DE TV / SINAL (LUCAS):*\n👤 {nome} ({telefone})\n💬 Relato: {(mensagem or '')[:160]}"
         registrar_evento_email(
@@ -447,7 +510,7 @@ def diagnosticar_suporte_lucas(pnome, nome, telefone, mensagem, tipo_midia, text
         ]
         return baloes, notificacao
 
-    # 3. Oscilação de Wi-Fi / internet lenta / buffering
+    # 6. Oscilação de Wi-Fi / internet lenta / buffering
     if any(p in texto_ascii for p in ["travando", "engasgando", "oscilando", "carregando", "bolinha", "internet", "rede", "wifi", "wi-fi", "lenta", "rota", "dns"]):
         registrar_evento_email(
             "SUPORTE_TECNICO", nome, telefone, 0.0,
@@ -458,19 +521,6 @@ def diagnosticar_suporte_lucas(pnome, nome, telefone, mensagem, tipo_midia, text
             f"Vamos estabilizar essa conexão agora{virgula_nome}!",
             "Quase sempre que dá essas engasgadas é oscilação do Wi-Fi comum ou rota da operadora. Tenta conectar na rede *5G* do seu roteador (ou cabo na TV) e tira o roteador da tomada por *30 segundos* pra renovar o DNS.",
             "Me fala também: tá travando em todos os canais ou em um específico? E em qual aparelho você está usando?"
-        ]
-        return baloes, notificacao
-
-    # 4. Computador / Windows / PDV / Impressora
-    if any(p in texto_ascii for p in ["pc", "computador", "notebook", "windows", "formatar", "pdv", "caixa", "impressora", "leitor"]):
-        registrar_evento_email(
-            "SUPORTE_TECNICO", nome, telefone, 0.0,
-            mensagem[:180],
-            "Triagem técnica iniciada para Windows / Sistema PDV Caixa (impressora, leitor ou desempenho)."
-        )
-        baloes = [
-            f"Tranquilo{virgula_nome}, vamos organizar isso!",
-            "Me conta só um detalhe pra eu separar a solução certa: é lentidão no Windows/PC ou algum erro no Sistema PDV (impressora, leitor ou navegador)? Se aparecer erro na tela, pode mandar foto por aqui!"
         ]
         return baloes, notificacao
 
@@ -508,18 +558,16 @@ def gerar_resposta_fallback_inteligente(setor, pnome, mensagem_usuario):
                 "Nossa Central CinePro TV reúne 200 canais públicos e gratuitos (TV aberta do Brasil, Notícias e Rádios) para abrir no celular, computador ou Smart TV, sem precisar instalar aplicativo nem prometer canais fechados pagos.",
                 f"Se quiser abrir agora gratuitamente, é só acessar: {LINK_PLAYER_IPTV}"
             ]
+        elif setor == "SETOR_3_COMERCIAL":
+            return [
+                f"Funciona sim{virgula_nome}! Como o nosso Sistema PDV & Frotas roda 100% na nuvem pelo navegador, você abre direto no celular, tablet, notebook ou computador do balcão sem instalar programa pesado.",
+                "Quer que eu te mande a chave PIX de R$ 150 pra implantar hoje ou prefere ver os detalhes do Combo R$ 350?"
+            ]
         else:
             return [
                 f"Com certeza{virgula_nome}! Todos os nossos sistemas rodam 100% na nuvem direto pelo navegador, super leves no celular, tablet ou computador.",
                 "Você prefere conhecer o Sistema PDV & Frotas para comércio (a partir de R$ 150) ou abrir nossa Central gratuita de TV Aberta e Rádios?"
             ]
-
-    # Dúvidas de Pagamento / Cartão / Parcelamento
-    if any(k in texto_limpo for k in ["cartao", "credito", "debito", "parcel", "vezes", "boleto", "dinheiro"]):
-        return [
-            f"Trabalhamos preferencialmente com PIX{virgula_nome}, que ativa na hora com confirmação automática!",
-            "Se você precisar de link de cartão ou parcelamento, eu anoto aqui e o Jonas te envia o link do Mercado Pago em seguida, tudo bem?\n\nQuer que eu já prepare a sua ativação?"
-        ]
 
     # Dúvidas sobre Internet / Modo Offline
     if any(k in texto_limpo for k in ["sem internet", "caiu a net", "offline", "precisa de net"]):
@@ -530,8 +578,18 @@ def gerar_resposta_fallback_inteligente(setor, pnome, mensagem_usuario):
                 "Quer que eu te mande a chave PIX de R$ 150 pra já implantar no seu negócio?"
             ]
 
-    # Cumprimentos e gírias informais
-    if any(k in texto_limpo for k in ["salve", "tranquilo", "beleza", "e ai", "fala ai", "opa tudo bem", "opa"]):
+    # Cumprimentos e confirmações informais mantêm o foco do atendente atual
+    if any(k in texto_limpo for k in ["salve", "tranquilo", "beleza", "e ai", "fala ai", "opa tudo bem", "opa", "blz", "ok", "certo", "entendi"]):
+        if setor == "SETOR_1_CINEPRO":
+            return [
+                f"Show{virgula_nome}! 😊 Aqui é a Camila. O link gratuito dos 200 canais abertos e rádios já está liberado aqui:",
+                f"{LINK_PLAYER_IPTV}\n\nQualquer dúvida pra abrir na TV ou no celular é só falar!"
+            ]
+        elif setor == "SETOR_3_COMERCIAL":
+            return [
+                f"Show{virgula_nome}! Aqui é o Marcos. Se quiser já dar o próximo passo hoje, posso gerar o PIX do Sistema PDV (R$ 150), Chat 24h (R$ 250) ou Combo Completo (R$ 350).",
+                "Qual opção faz mais sentido pro seu negócio agora?"
+            ]
         return [
             f"Opa{virgula_nome}, tudo tranquilo por aqui e com você? 🚀",
             "Como posso te ajudar hoje? Temos nosso Sistema PDV & Frotas na nuvem, Suporte Técnico e nossa Central gratuita com 200 canais de TV Aberta, Notícias e Rádios!"
@@ -552,22 +610,22 @@ def gerar_resposta_fallback_inteligente(setor, pnome, mensagem_usuario):
     elif setor == "SETOR_3_COMERCIAL":
         return [
             f"Perfeito{virgula_nome}! Sou o Marcos do comercial da Jonas Tech.",
-            "Nós implantamos o Sistema PDV Frente de Caixa + Ponto de Equilíbrio + CRM + Frotas 100% na Nuvem (R$ 150 taxa de implantação), Chat de Atendimento 24h (R$ 250) e o Combo Modernização completo (R$ 350).",
-            "Me conta um pouco do seu comércio ou da sua ideia pra eu te indicar a melhor opção!"
+            "Nós implantamos o Sistema PDV Frente de Caixa + Ponto de Equilíbrio + CRM + Frotas 100% na Nuvem (R$ 150 taxa única), Chat de Atendimento 24h (R$ 250), Otimização de PC (R$ 150) e o Combo Modernização completo (R$ 350).",
+            "Me conta um pouco do seu comércio ou qual solução você quer ativar primeiro!"
         ]
 
     return obter_recepcao_natural(pnome)
 
 
-def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tipo_midia="text", texto_comprovante=""):
+def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tipo_midia="text", texto_comprovante="", canal="whatsapp"):
     texto = (mensagem or "").strip().lower()
     pnome = obter_primeiro_nome(nome)
     virgula_nome = f", {pnome}" if pnome else ""
     dados_extras = {}
 
-    # 0. COMANDOS MESTRES DO JONAS PELO PRÓPRIO WHATSAPP
+    # 0. COMANDOS MESTRES DO JONAS PELO PRÓPRIO WHATSAPP (restrito ao WhatsApp + número oficial)
     tel_limpo = "".join(c for c in str(telefone) if c.isdigit())
-    eh_jonas = tel_limpo.endswith("966707293") or "jonas" in (nome or "").lower()
+    eh_jonas = (canal == "whatsapp") and tel_limpo.endswith("966707293")
 
     if eh_jonas and texto in ["desligar", "pausar", "dormir", "parar", "#desligar", "#pausar"]:
         definir_status_robo(False)
@@ -637,11 +695,17 @@ def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tip
     setor_atual = (lead or {}).get("setor_atual", "MENU_INICIAL")
     dados_extras["origem"] = "VITRINE_COMERCIAL"
 
-    # Áudio recebido do cliente: pede gentilmente por texto sem parecer robô
+    # Áudio recebido do cliente: pede gentilmente por texto mantendo o atendente do setor
     if tipo_midia == "audio":
+        mapa_atendente_audio = {
+            "SETOR_1_CINEPRO": "Camila",
+            "SETOR_2_SUPORTE": "Lucas",
+            "SETOR_3_COMERCIAL": "Marcos",
+            "SETOR_4_JONAS_HUMANO": "Equipe do Jonas",
+        }
         return (
             setor_atual,
-            "Atendimento Jonas Tech",
+            mapa_atendente_audio.get(setor_atual, "Atendimento Jonas Tech"),
             [f"Oi{virgula_nome}! Tô na bancada aqui agora com barulho e não consigo ouvir áudio, consegue me mandar por escrito rapidinho por favor? 😊"],
             dados_extras
         )
@@ -764,21 +828,31 @@ def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tip
 
     # 4. DETECÇÃO PRECISA DE INTENÇÃO E TROCA DE ASSUNTO NO MEIO DA CONVERSA
     texto_compacto = re.sub(r"\s+", " ", texto).strip()
-    eh_opc_1 = texto_compacto in ["1", "opcao 1", "opção 1"]
-    eh_opc_2 = texto_compacto in ["2", "opcao 2", "opção 2"]
-    eh_opc_3 = texto_compacto in ["3", "opcao 3", "opção 3"]
-    eh_opc_4 = texto_compacto in ["4", "opcao 4", "opção 4"]
+    opc_limpa = texto_compacto.rstrip(".):-! ")
+    eh_opc_1 = opc_limpa in ["1", "opcao 1", "opção 1"]
+    eh_opc_2 = opc_limpa in ["2", "opcao 2", "opção 2"]
+    eh_opc_3 = opc_limpa in ["3", "opcao 3", "opção 3"]
+    eh_opc_4 = opc_limpa in ["4", "opcao 4", "opção 4"]
 
-    eh_intencao_humano = eh_opc_4 or texto_compacto == "jonas" or any(p in texto for p in ["falar com jonas", "falar com o jonas", "chama o jonas", "atendente humano", "falar com humano", "falar com dono"])
-    eh_intencao_pdv_comercial = eh_opc_3 or any(p in texto for p in ["pdv", "sistema de caixa", "estoque", "150", "250", "350", "combo", "frota", "locadora", "mercadinho", "loja", "comercio", "comércio", "orçamento", "orcamento", "automação", "automacao", "robô", "robo"])
-    eh_intencao_suporte = eh_opc_2 or any(p in texto for p in [
-        "suporte", "tecnico", "técnico", "defeito", "erro", "formatar", "pc lento", "computador lento",
-        "travando", "engasgando", "oscilando", "tela preta", "sem som", "fora do ar", "canal caiu",
-        "parou", "nao funciona", "não funciona", "nao pega", "não pega", "nao abre", "não abre",
-        "nao entra", "não entra", "nao carrega", "não carrega", "travou", "caiu", "sumiu", "sem sinal",
-        "colocar na tv", "coloca na tv", "botar na tv", "instalar na tv", "como coloca"
+    texto_sem_acento = normalizar_ascii(texto)
+    eh_intencao_humano = eh_opc_4 or opc_limpa == "jonas" or any(p in texto_sem_acento for p in ["falar com jonas", "falar com o jonas", "chama o jonas", "atendente humano", "falar com humano", "falar com dono"])
+    eh_intencao_pdv_comercial = eh_opc_3 or any(p in texto_sem_acento for p in [
+        "pdv", "sistema de caixa", "estoque", "150", "250", "350", "combo", "frota",
+        "locadora", "mercadinho", "loja", "comercio", "orcamento", "automacao",
+        "robo", "atendimento online", "atendimento 24", "otimizacao", "windows boost"
     ])
-    eh_intencao_tv = eh_opc_1 or any(p in texto for p in ["tv", "iptv", "cinepro", "canais", "radio", "rádio", "aberta"])
+    eh_intencao_suporte = eh_opc_2 or any(p in texto_sem_acento for p in [
+        "suporte", "tecnico", "defeito", "erro", "formatar", "pc lento", "computador lento",
+        "travando", "engasgando", "oscilando", "tela preta", "sem som", "fora do ar", "canal caiu",
+        "parou", "nao funciona", "nao pega", "nao abre", "nao entra", "nao carrega",
+        "travou", "caiu", "sumiu", "sem sinal", "colocar na tv", "coloca na tv", "botar na tv",
+        "instalar na tv", "como coloca", "todos os canais", "um canal", "um so"
+    ])
+    eh_intencao_tv = eh_opc_1 or any(p in texto_sem_acento for p in ["tv", "iptv", "cinepro", "canais", "radio", "aberta"])
+    eh_pedido_explicito_canais_tv = eh_opc_1 or any(p in texto_sem_acento for p in [
+        "canais", "tv aberta", "central gratuita", "central de tv", "cinepro",
+        "iptv", "radio", "quero testar a tv", "link da tv", "quero abrir a central"
+    ])
 
     resposta_anterior_lead = (lead or {}).get("resposta", "")
     lucas_ja_atendeu = (
@@ -792,12 +866,14 @@ def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tip
     elif setor_atual == "SETOR_1_CINEPRO" and (eh_intencao_suporte or eh_intencao_pdv_comercial):
         setor_atual = "MENU_INICIAL"
     elif (
-        setor_atual in ["SETOR_2_SUPORTE", "SETOR_3_COMERCIAL"]
+        setor_atual == "SETOR_2_SUPORTE"
         and eh_intencao_tv
         and not eh_intencao_pdv_comercial
         and not eh_intencao_suporte
-        and not any(p in texto for p in ["samsung", "lg", "roku", "tcl", "philco", "aoc", "tv box", "smart", "chromecast", "android tv"])
+        and not any(p in texto_sem_acento for p in ["samsung", "lg", "roku", "tcl", "philco", "aoc", "tv box", "smart", "chromecast", "android tv"])
     ):
+        setor_atual = "MENU_INICIAL"
+    elif setor_atual == "SETOR_3_COMERCIAL" and eh_pedido_explicito_canais_tv and not eh_intencao_pdv_comercial:
         setor_atual = "MENU_INICIAL"
 
     # 5. ROTEAMENTO CONVERSACIONAL RESOLUTIVO
@@ -811,20 +887,20 @@ def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tip
                 f"Pode deixar{virgula_nome}! Já dei um toque no celular pessoal do Jonas pra ele assumir nossa conversa aqui.",
                 "Se quiser, já pode ir mandando sua dúvida por escrito que assim que ele pegar no aparelho já te responde direto, combinado?"
             ]
-        elif eh_intencao_pdv_comercial or any(p in texto for p in ["venda", "comercial", "comprar", "preco", "preço", "sistema", "caixa", "quanto custa", "valor", "tabela", "serviços", "servicos", "sistemas"]):
+        elif eh_intencao_pdv_comercial or any(p in texto_sem_acento for p in ["venda", "comercial", "comprar", "preco", "sistema", "caixa", "quanto custa", "valor", "tabela", "servicos", "sistemas"]):
             novo_setor = "SETOR_3_COMERCIAL"
             atendente = "Marcos"
             baloes = [
                 f"Opa{virgula_nome}! Tudo bem? Aqui é o Marcos, trabalho na parte comercial junto com o Jonas.",
                 "Me conta rapidinho o que você tá buscando melhorar hoje pra eu te indicar o caminho certo: é nosso Sistema PDV + Estoque + Ponto de Equilíbrio & Frotas na Nuvem (R$ 150 implantação), Otimização de computador ou Atendimento Online 24h?"
             ]
-        elif eh_intencao_suporte or any(p in texto for p in ["pc", "computador", "notebook", "lento", "windows", "ajuda", "conserto"]):
+        elif eh_intencao_suporte or any(p in texto_sem_acento for p in ["pc", "computador", "notebook", "lento", "windows", "ajuda", "conserto"]):
             novo_setor = "SETOR_2_SUPORTE"
             atendente = "Lucas"
             baloes, notif = diagnosticar_suporte_lucas(pnome, nome, telefone, mensagem, tipo_midia, texto_comprovante, resposta_anterior_lead, lucas_ja_atendeu)
             if notif:
                 dados_extras["notificacao_jonas"] = notif
-        elif eh_intencao_tv or any(p in texto for p in ["teste", "testar", "futebol", "filme", "série", "serie", "jogo"]):
+        elif eh_intencao_tv or any(p in texto_sem_acento for p in ["teste", "testar", "futebol", "filme", "serie", "jogo"]):
             novo_setor = "SETOR_1_CINEPRO"
             atendente = "Camila"
             agora = agora_brasilia()
@@ -841,17 +917,32 @@ def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tip
     elif setor_atual == "SETOR_1_CINEPRO":
         atendente = "Camila"
         novo_setor = "SETOR_1_CINEPRO"
-        if any(p in texto for p in ["pix", "pagar", "comprar", "assinar", "quero fechar", "quero assinar", "ativar", "chave", "mensal", "quanto é", "quanto custa", "valor"]):
+        if any(p in texto_sem_acento for p in ["pix", "pagar", "comprar", "assinar", "quero fechar", "quero assinar", "ativar", "chave", "mensal", "quanto e", "quanto custa", "valor"]):
             baloes = [
                 f"Olha que notícia boa{virgula_nome}: a nossa Central com 200 canais de TV Aberta, Notícias e Rádios é totalmente gratuita no link oficial — não cobramos mensalidade por ela! 🎉",
                 f"Link gratuito: {LINK_PLAYER_IPTV}\n\nAgora, se você quiser contratar um portal personalizado com a sua marca ou o nosso Sistema PDV & Frotas para sua empresa (a partir de R$ 150 implantação), me avisa que eu passo para o Marcos gerar o PIX oficial!"
             ]
-        elif any(p in texto for p in ["smart", "samsung", "lg", "roku", "tv box", "box", "fire", "android", "como instala", "colocar na tv"]):
+        elif "roku" in texto_sem_acento:
+            baloes = [
+                f"Na *Roku TV* é bem tranquilo{virgula_nome}! Como ela não traz navegador aberto para digitar endereços, o jeito certo é abrir o nosso link no celular e clicar em *Transmitir / Espelhar Tela* (Smart View ou AirPlay) para jogar na TV.",
+                f"Link gratuito para abrir no celular:\n{LINK_PLAYER_IPTV}"
+            ]
+        elif any(p in texto_sem_acento for p in ["samsung", "lg", "tcl", "philco", "aoc", "tv box", "box", "fire", "android"]):
+            baloes = [
+                f"Nesse modelo é bem rápido{virgula_nome}! Abra o aplicativo *Internet / Navegador / Browser* da sua TV ou TV Box e digite o link:\n{LINK_PLAYER_IPTV}",
+                "Depois é só salvar nos favoritos da TV para entrar com 1 clique sempre que quiser assistir!"
+            ]
+        elif any(p in texto_sem_acento for p in ["smart", "como instala", "colocar na tv"]):
             baloes = [
                 "Na Smart TV ou TV Box é bem simples! Dá pra abrir direto pelo navegador da própria TV usando o nosso link gratuito.",
                 "Qual é a marca da sua TV aí (Samsung, LG, Roku ou TV Box)? Me fala que te explico certinho como colocar!"
             ]
-        elif any(p in texto for p in ["abriu", "funcionou", "top", "bom", "gostei", "rodou", "show", "ótimo", "otimo", "sim", "deu certo"]):
+        elif any(p in texto_sem_acento for p in ["globo", "sbt", "record", "band", "sportv", "premiere", "netflix", "futebol", "jogo", "fechado"]):
+            baloes = [
+                f"Boa pergunta{virgula_nome}! Aqui a Central gratuita traz *200 canais abertos públicos, notícias e rádios* (não inclui canais pagos fechados, Premiere nem streaming privado).",
+                f"Você pode conferir a grade completa grátis direto pelo navegador aqui:\n{LINK_PLAYER_IPTV}"
+            ]
+        elif any(p in texto_sem_acento for p in ["abriu", "funcionou", "top", "bom", "gostei", "rodou", "show", "otimo", "sim", "deu certo"]):
             baloes = [
                 f"Que massa{virgula_nome}, fico feliz que rodou liso aí! 😄",
                 "Pode salvar o link nos favoritos pra assistir quando quiser, sem custo nenhum! Se precisar de Sistema PDV ou suporte pro seu PC ou loja, é só chamar por aqui."
@@ -869,25 +960,59 @@ def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tip
     elif setor_atual == "SETOR_3_COMERCIAL":
         atendente = "Marcos"
         novo_setor = "SETOR_3_COMERCIAL"
-        if any(p in texto for p in ["pix", "chave", "pagar", "comprar", "fechar", "manda a chave", "quero fechar", "vou querer"]):
-            if any(k in texto for k in ["combo", "350"]):
+        plano_salvo = (lead or {}).get("plano_comercial", "150")
+        if any(p in texto_sem_acento for p in ["cartao", "credito", "debito", "parcel", "vezes", "boleto"]):
+            disparar_alerta_cliente_quente(telefone, nome, f"CLIENTE PEDIU LINK CARTAO / PARCELAMENTO ({texto[:80]})")
+            dados_extras["notificacao_jonas"] = (
+                f"💳 *PEDIDO DE LINK CARTÃO/PARCELADO (MARCOS):*\n"
+                f"👤 Cliente: {nome} ({telefone})\n"
+                f"💬 Mensagem: {(mensagem or '')[:140]}"
+            )
+            baloes = [
+                f"Com certeza{virgula_nome}! Trabalhamos com PIX na hora e também com link de cartão pelo Mercado Pago.",
+                "Já avisei o Jonas aqui agora mesmo para ele te enviar o link certinho do Mercado Pago, combinado?"
+            ]
+        elif any(p in texto_sem_acento for p in ["pix", "chave", "pagar", "comprar", "fechar", "manda a chave", "quero fechar", "vou querer"]):
+            if any(k in texto_sem_acento for k in ["combo", "350"]) or (plano_salvo == "350" and not any(k in texto_sem_acento for k in ["150", "250", "pdv"])):
                 valor_num, valor_str = 350.0, "R$ 350,00 (Combo Modernização 3 em 1)"
-            elif any(k in texto for k in ["250", "whatsapp", "robo", "robô", "atendimento", "chat"]):
+                dados_extras["plano_comercial"] = "350"
+            elif any(k in texto_sem_acento for k in ["250", "whatsapp", "robo", "atendimento", "chat"]) or (plano_salvo == "250" and not any(k in texto_sem_acento for k in ["150", "350", "pdv"])):
                 valor_num, valor_str = 250.0, "R$ 250,00 (Chat 24h na Nuvem + Automação)"
+                dados_extras["plano_comercial"] = "250"
             else:
                 valor_num, valor_str = 150.0, "R$ 150,00 (Sistema PDV, CRM & Frotas na Nuvem - taxa única)"
+                dados_extras["plano_comercial"] = "150"
             disparar_alerta_cliente_quente(telefone, nome, f"CLIENTE PEDIU PIX COMERCIAL {valor_str}", valor_num)
             baloes = montar_bloco_pix(pnome, valor_str)
-        elif any(p in texto for p in ["loja", "mercado", "mercadinho", "adega", "bar", "lanchonete", "comercio", "comércio", "estoque", "caderno", "planilha", "caixa", "pdv", "frota", "locadora"]):
+        elif any(p in texto_sem_acento for p in ["mensalidade", "por mes", "todo mes", "aluguel", "anuidade", "quanto custa", "valor", "preco"]):
             baloes = [
-                f"Olha que economia boa dá pra fazer aí{virgula_nome}: quem sai do caderno ou de sistema com mensalidade pro nosso PDV & ERP na Nuvem economiza mais de R$ 1.200 no ano, porque você paga R$ 150 na implantação sem mensalidade de aluguel do sistema!",
-                "Ele já funciona 100% na nuvem no celular ou computador, controla estoque, calcula Ponto de Equilíbrio, faz venda fiado com cobrança no WhatsApp, gera QR Code PIX na tela e ainda traz módulo de Locadora & Frotas.\n\nPrefere fechar só o PDV de R$ 150 hoje ou quer ver o Combo Completo de R$ 350?"
+                f"Sem susto de mensalidade{virgula_nome}! O nosso *Sistema PDV & Frotas na Nuvem* tem implantação única de *R$ 150* (zero aluguel mensal do sistema).",
+                "Temos também o *Chat 24h com Automação WhatsApp* por *R$ 250* e o *Combo Completo 3 em 1* por *R$ 350*. Qual deles você quer ver ou já ativar agora?"
             ]
-        elif any(p in texto for p in ["combo", "pacote", "proposta", "melhoria", "desconto", "tudo", "completo"]):
+        elif any(p in texto_sem_acento for p in ["combo", "pacote", "proposta", "melhoria", "desconto", "tudo", "completo", "350"]):
+            dados_extras["plano_comercial"] = "350"
             baloes = [
                 f"Montei a nossa melhor proposta de modernização pra você{virgula_nome}:",
                 "Fazendo separado sairia R$ 550 (PDV + Frotas na Nuvem R$ 150 + Otimização de PC R$ 150 + Chat 24h & Automação R$ 250). Fechando o Combo Modernização 3 em 1 hoje, consigo validar pra você por R$ 350 pagamento único — economia de R$ 200 na hora!",
                 "Quer que eu já valide essa condição de R$ 350 e te mande a chave PIX oficial?"
+            ]
+        elif any(p in texto_sem_acento for p in ["otimizacao", "windows boost", "computador", "pc"]):
+            dados_extras["plano_comercial"] = "150"
+            baloes = [
+                f"Boa escolha{virgula_nome}! Na *Otimização Windows Boost (R$ 150)* deixamos seu computador leve, rápido e limpo, ou se preferir você leva junto no *Combo Completo de R$ 350* (PDV + Otimização + Chat 24h).",
+                "Quer fechar só a Otimização/PDV de R$ 150 ou garantir o Combo de R$ 350 com R$ 200 de desconto?"
+            ]
+        elif any(p in texto_sem_acento for p in ["250", "whatsapp", "robo", "atendimento", "chat", "automacao"]):
+            dados_extras["plano_comercial"] = "250"
+            baloes = [
+                f"Nosso *Atendimento Online 24h + Automação WhatsApp* fica *R$ 250 pagamento único*{virgula_nome}!",
+                "Ele atende seus clientes automaticamente no chat da nuvem e no WhatsApp, separa os setores (Suporte, Vendas, Financeiro), gera chave PIX e confere comprovante sozinho.\n\nQuer que eu te mande a chave PIX de R$ 250 ou prefere incluir no Combo de R$ 350?"
+            ]
+        elif any(p in texto_sem_acento for p in ["loja", "mercado", "mercadinho", "adega", "bar", "lanchonete", "comercio", "estoque", "caderno", "planilha", "caixa", "pdv", "frota", "locadora", "150"]):
+            dados_extras["plano_comercial"] = "150"
+            baloes = [
+                f"Olha que economia boa dá pra fazer aí{virgula_nome}: quem sai do caderno ou de sistema com mensalidade pro nosso PDV & ERP na Nuvem economiza mais de R$ 1.200 no ano, porque você paga R$ 150 na implantação sem mensalidade de aluguel do sistema!",
+                "Ele já funciona 100% na nuvem no celular ou computador, controla estoque, calcula Ponto de Equilíbrio, faz venda fiado com cobrança no WhatsApp, gera QR Code PIX na tela e ainda traz módulo de Locadora & Frotas.\n\nPrefere fechar só o PDV de R$ 150 hoje ou quer ver o Combo Completo de R$ 350?"
             ]
         else:
             baloes = gerar_resposta_fallback_inteligente("SETOR_3_COMERCIAL", pnome, mensagem)
@@ -896,7 +1021,7 @@ def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tip
         atendente = "Equipe do Jonas"
         novo_setor = "SETOR_4_JONAS_HUMANO"
         if (lead or {}).get("avisou_aguardo_humano"):
-            return novo_setor, "Aguardando Jonas", [], {}
+            return novo_setor, "Aguardando Jonas", [], {"aguardando_humano": True}
         dados_extras["avisou_aguardo_humano"] = True
         baloes = ["Anotei aqui pra ele ver assim que pegar no celular, fica tranquilo! 👍"]
 
@@ -2268,14 +2393,20 @@ def _executar_turno_chat_web(sessao_id, nome, telefone_raw, mensagem_user, msg_e
         identificador = "55" + tel_digitos
 
     novo_setor, atendente, baloes, extras = processar_mensagem_inteligente(
-        identificador, nome, mensagem_user, midia_url=None, tipo_midia=tipo_midia, texto_comprovante=texto_comprovante
+        identificador, nome, mensagem_user, midia_url=None, tipo_midia=tipo_midia, texto_comprovante=texto_comprovante, canal="web"
     )
 
-    if extras.get("ignorado") or not baloes:
+    if extras.get("ignorado"):
         atendente = "Equipe do Jonas"
         novo_setor = "SETOR_4_JONAS_HUMANO"
         baloes = [
             "O atendimento automático geral está pausado momentaneamente, mas você pode chamar o Jonas diretamente no WhatsApp pelo botão abaixo!"
+        ]
+    elif extras.get("aguardando_humano") or not baloes:
+        atendente = "Equipe do Jonas"
+        novo_setor = "SETOR_4_JONAS_HUMANO"
+        baloes = [
+            "Seu recado já está na fila prioritária do Jonas! Você também pode falar com ele direto no WhatsApp abaixo ou digitar *menu* para voltar aos atendentes."
         ]
 
     if leads_col is not None:
