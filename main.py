@@ -78,6 +78,7 @@ try:
     col_custos = db["custos_fixos_loja"]
     col_veiculos = db["veiculos_frotas"]
     col_apolices = db["apolices_seguros"]
+    col_chat_web = db["chat_web_historico"]
     print("[NUVEM] Conexão com MongoDB Atlas validada com sucesso!")
 except Exception as e:
     print(f"[ERRO MONGODB NUVEM] {e}")
@@ -96,6 +97,7 @@ except Exception as e:
     col_custos = None
     col_veiculos = None
     col_apolices = None
+    col_chat_web = None
 
 
 def agora_brasilia():
@@ -2118,6 +2120,224 @@ def api_seguros_deletar_apolice(numero):
         if res.deleted_count == 0:
             return jsonify({"erro": "Apólice não encontrada."}), 404
         return jsonify({"sucesso": True, "mensagem": f"Apólice {num_limpo} removida."}), 200
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
+
+# ==============================================================================
+# CHAT DE ATENDIMENTO PRÓPRIO 24H NA NUVEM (SEM PC LIGADO / SEM QR CODE)
+# ==============================================================================
+
+def _montar_extras_chat_web(baloes, novo_setor, extras):
+    """Enriquece os balões do robô com QR Code PIX e atalhos visuais no chat web."""
+    texto_junto = "\n".join(baloes or [])
+    resultado = {}
+
+    if CHAVE_PIX_OFICIAL in texto_junto:
+        valor_pix = 30.0
+        m_val = re.search(r"R\$\s*(\d+(?:[,\.]\d{2})?)", texto_junto)
+        if m_val:
+            try:
+                valor_pix = float(m_val.group(1).replace(",", "."))
+            except ValueError:
+                valor_pix = 30.0
+        payload_pix = gerar_payload_pix(CHAVE_PIX_OFICIAL, TITULAR_CONTA, CIDADE_RECEBEDOR, valor_pix)
+        resultado["pix_card"] = {
+            "chave_pix": CHAVE_PIX_OFICIAL,
+            "titular": TITULAR_CONTA,
+            "valor": valor_pix,
+            "payload_copia_cola": payload_pix,
+            "qrcode_url": gerar_url_qrcode_instantaneo(payload_pix, 240)
+        }
+
+    m_user = re.search(r"Usuário:\s*([^\s\n]+)", texto_junto)
+    m_pass = re.search(r"Senha:\s*([^\s\n]+)", texto_junto)
+    m_link = re.search(r"(https://agente-whatsapp-jonas\.onrender\.com/tv[^\s\n]*)", texto_junto)
+    if m_link or (m_user and m_pass):
+        resultado["acesso_tv"] = {
+            "usuario": m_user.group(1) if m_user else "",
+            "senha": m_pass.group(1) if m_pass else "",
+            "link": m_link.group(1) if m_link else LINK_PLAYER_IPTV
+        }
+
+    if novo_setor in ["SETOR_4_JONAS_HUMANO", "PAGAMENTO_EM_ANALISE"] or extras.get("ignorado"):
+        dig_whats = "".join(c for c in WHATSAPP_HUMANO if c.isdigit())
+        resultado["link_humano"] = f"https://wa.me/55{dig_whats}?text=" + urllib.parse.quote("Olá, Jonas! Vim pelo Atendimento Online 24h.")
+
+    return resultado
+
+
+def _salvar_historico_chat_web(sessao_id, nome_user, msg_user, autor_bot, baloes_bot, extras_rich):
+    """Salva turno do chat web no MongoDB Atlas para restaurar ao recarregar."""
+    if col_chat_web is None or not sessao_id:
+        return
+    try:
+        hora_str = agora_brasilia().strftime("%H:%M")
+        ts = time.time()
+        docs = [{
+            "sessao_id": sessao_id,
+            "origem": "user",
+            "autor": nome_user or "Cliente Online",
+            "texto": msg_user,
+            "hora": hora_str,
+            "ts": ts,
+            "extras": {}
+        }]
+        for idx, b in enumerate(baloes_bot):
+            eh_ultimo = (idx == len(baloes_bot) - 1)
+            docs.append({
+                "sessao_id": sessao_id,
+                "origem": "bot",
+                "autor": autor_bot or "Jonas Tech",
+                "texto": b,
+                "hora": hora_str,
+                "ts": ts + (idx + 1) * 0.01,
+                "extras": extras_rich if eh_ultimo else {}
+            })
+        col_chat_web.insert_many(docs)
+    except Exception as e:
+        print(f"[ERRO HISTORICO CHAT WEB]: {e}")
+
+
+def _executar_turno_chat_web(sessao_id, nome, telefone_raw, mensagem_user, msg_exibicao_historico, tipo_midia="text", texto_comprovante=""):
+    tel_digitos = "".join(c for c in str(telefone_raw or "") if c.isdigit())
+    identificador = tel_digitos if len(tel_digitos) >= 10 else f"web_{sessao_id}"
+    if len(tel_digitos) == 10 or len(tel_digitos) == 11:
+        identificador = "55" + tel_digitos
+
+    novo_setor, atendente, baloes, extras = processar_mensagem_inteligente(
+        identificador, nome, mensagem_user, midia_url=None, tipo_midia=tipo_midia, texto_comprovante=texto_comprovante
+    )
+
+    if extras.get("ignorado") or not baloes:
+        atendente = "Equipe do Jonas"
+        novo_setor = "SETOR_4_JONAS_HUMANO"
+        baloes = [
+            "O atendimento automático geral está pausado momentaneamente, mas você pode chamar o Jonas diretamente no WhatsApp pelo botão abaixo!"
+        ]
+
+    if leads_col is not None:
+        try:
+            update_data = {
+                "nome": nome,
+                "setor_atual": novo_setor,
+                "atendente_responsavel": atendente,
+                "ultima_mensagem": msg_exibicao_historico,
+                "resposta": "\n\n".join(baloes),
+                "canal": "CHAT_WEB_NUVEM",
+                "status": "EM_ATENDIMENTO_HUMANO",
+                "atualizado_em": agora_brasilia().strftime("%Y-%m-%d %H:%M:%S")
+            }
+            for k, v in extras.items():
+                if k not in ["notificacao_jonas", "envio_extra_cliente"]:
+                    update_data[k] = v
+            leads_col.update_one({"telefone": identificador}, {"$set": update_data}, upsert=True)
+        except Exception as e:
+            print(f"[ERRO LEAD CHAT WEB]: {e}")
+
+    extras_rich = _montar_extras_chat_web(baloes, novo_setor, extras)
+    _salvar_historico_chat_web(sessao_id, nome, msg_exibicao_historico, atendente, baloes, extras_rich)
+
+    return {
+        "sucesso": True,
+        "setor": novo_setor,
+        "atendente": atendente,
+        "baloes": baloes,
+        "pix_card": extras_rich.get("pix_card"),
+        "acesso_tv": extras_rich.get("acesso_tv"),
+        "link_humano": extras_rich.get("link_humano")
+    }
+
+
+@app.route("/atendimento", methods=["GET"])
+@app.route("/chat", methods=["GET"])
+def rota_atendimento_web_nuvem():
+    """Serve o Chat de Atendimento Online 24h direto do Render sem PC ligado."""
+    caminho = os.path.join(os.path.dirname(os.path.abspath(__file__)), "atendimento_nuvem.html")
+    if os.path.exists(caminho):
+        with open(caminho, "r", encoding="utf-8") as f:
+            return f.read(), 200, {"Content-Type": "text/html; charset=utf-8"}
+    return "Atendimento Online em atualização", 404
+
+
+@app.route("/api/atendimento/historico", methods=["GET"])
+def api_atendimento_historico():
+    sessao_id = (request.args.get("sessao_id") or "").strip()
+    if not sessao_id or col_chat_web is None:
+        return jsonify({"mensagens": []}), 200
+    try:
+        msgs = list(col_chat_web.find({"sessao_id": sessao_id}, {"_id": 0}).sort("ts", 1).limit(50))
+        return jsonify({"mensagens": msgs}), 200
+    except Exception as e:
+        return jsonify({"mensagens": [], "erro": str(e)}), 500
+
+
+@app.route("/api/atendimento/mensagem", methods=["POST", "OPTIONS"])
+def api_atendimento_mensagem():
+    if request.method == "OPTIONS":
+        return jsonify({"status": "ok"}), 200
+    try:
+        dados = request.get_json(silent=True) or {}
+        sessao_id = re.sub(r"[^a-zA-Z0-9_-]", "", str(dados.get("sessao_id") or "").strip())[:64]
+        mensagem = str(dados.get("mensagem") or "").strip()
+        nome = str(dados.get("nome") or "Cliente Online").strip()[:60]
+        telefone = str(dados.get("telefone") or "").strip()[:25]
+
+        if not sessao_id:
+            return jsonify({"erro": "Sessão inválida."}), 400
+        if not mensagem:
+            return jsonify({"erro": "Digite uma mensagem para enviar."}), 400
+
+        resposta = _executar_turno_chat_web(sessao_id, nome, telefone, mensagem, mensagem, tipo_midia="text")
+        return jsonify(resposta), 200
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
+
+@app.route("/api/atendimento/comprovante", methods=["POST", "OPTIONS"])
+def api_atendimento_comprovante():
+    if request.method == "OPTIONS":
+        return jsonify({"status": "ok"}), 200
+    try:
+        if request.is_json:
+            dados = request.get_json(silent=True) or {}
+            sessao_id = re.sub(r"[^a-zA-Z0-9_-]", "", str(dados.get("sessao_id") or "").strip())[:64]
+            nome = str(dados.get("nome") or "Cliente Online").strip()[:60]
+            telefone = str(dados.get("telefone") or "").strip()[:25]
+            texto_comp = str(dados.get("texto_comprovante") or "").strip()
+            nome_arq = ""
+        else:
+            sessao_id = re.sub(r"[^a-zA-Z0-9_-]", "", str(request.form.get("sessao_id") or "").strip())[:64]
+            nome = str(request.form.get("nome") or "Cliente Online").strip()[:60]
+            telefone = str(request.form.get("telefone") or "").strip()[:25]
+            texto_comp = str(request.form.get("texto_comprovante") or "").strip()
+            arq = request.files.get("arquivo")
+            nome_arq = arq.filename if arq else ""
+            if arq:
+                raw_bytes = arq.read(1024 * 1024 * 2)  # Limite seguro 2MB
+                if nome_arq.lower().endswith(".txt"):
+                    texto_comp = (texto_comp + "\n" + raw_bytes.decode("utf-8", errors="ignore")).strip()
+                elif nome_arq.lower().endswith(".pdf"):
+                    trechos = re.findall(rb"[A-Za-z0-9\s\.\,\-\:\/\$R]{5,}", raw_bytes)
+                    extra_pdf = " ".join(t.decode("latin-1", errors="ignore") for t in trechos[:120])
+                    texto_comp = (texto_comp + "\n" + extra_pdf[:1000]).strip()
+
+        if not sessao_id:
+            return jsonify({"erro": "Sessão inválida."}), 400
+        if not texto_comp and not nome_arq:
+            return jsonify({"erro": "Informe o texto do comprovante ou anexe um arquivo."}), 400
+
+        resumo_usuario = f"📎 Comprovante: {nome_arq} {texto_comp[:120]}".strip()
+        resposta = _executar_turno_chat_web(
+            sessao_id,
+            nome,
+            telefone,
+            texto_comp or "comprovante",
+            resumo_usuario,
+            tipo_midia="image",
+            texto_comprovante=texto_comp
+        )
+        return jsonify(resposta), 200
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
 
