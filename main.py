@@ -732,37 +732,28 @@ def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tip
     if texto in saudacoes_puras:
         setor_atual = "MENU_INICIAL"
 
-    # 4. TROCA INTELIGENTE DE ASSUNTO NO MEIO DA CONVERSA
-    if any(p in texto for p in ["falar com jonas", "falar com o jonas", "chama o jonas", "atendente humano", "falar com humano"]):
+    # 4. DETECÇÃO PRECISA DE INTENÇÃO E TROCA DE ASSUNTO NO MEIO DA CONVERSA
+    texto_compacto = re.sub(r"\s+", " ", texto).strip()
+    eh_opc_1 = texto_compacto in ["1", "opcao 1", "opção 1"]
+    eh_opc_2 = texto_compacto in ["2", "opcao 2", "opção 2"]
+    eh_opc_3 = texto_compacto in ["3", "opcao 3", "opção 3"]
+    eh_opc_4 = texto_compacto in ["4", "opcao 4", "opção 4"]
+
+    eh_intencao_humano = eh_opc_4 or texto_compacto == "jonas" or any(p in texto for p in ["falar com jonas", "falar com o jonas", "chama o jonas", "atendente humano", "falar com humano", "falar com dono"])
+    eh_intencao_pdv_comercial = eh_opc_3 or any(p in texto for p in ["pdv", "sistema de caixa", "estoque", "150", "250", "350", "combo", "frota", "locadora", "mercadinho", "loja", "comercio", "comércio", "orçamento", "orcamento", "automação", "automacao", "robô", "robo"])
+    eh_intencao_suporte = eh_opc_2 or any(p in texto for p in ["suporte", "tecnico", "técnico", "defeito", "erro", "formatar", "pc lento", "computador lento", "travando", "engasgando", "oscilando", "tela preta", "sem som", "fora do ar", "canal caiu"])
+    eh_intencao_tv = eh_opc_1 or any(p in texto for p in ["tv", "iptv", "cinepro", "canais", "radio", "rádio", "aberta"])
+
+    if eh_intencao_humano:
         setor_atual = "MENU_INICIAL"
-    elif setor_atual == "SETOR_1_CINEPRO" and any(p in texto for p in ["travando", "engasgando", "oscilando", "tela preta", "sem som", "fora do ar", "canal caiu", "suporte", "pdv", "sistema de caixa", "estoque", "150", "pc lento", "formatar"]):
+    elif setor_atual == "SETOR_1_CINEPRO" and (eh_intencao_suporte or eh_intencao_pdv_comercial):
+        setor_atual = "MENU_INICIAL"
+    elif setor_atual in ["SETOR_2_SUPORTE", "SETOR_3_COMERCIAL"] and eh_intencao_tv and not eh_intencao_pdv_comercial and not eh_intencao_suporte:
         setor_atual = "MENU_INICIAL"
 
     # 5. ROTEAMENTO CONVERSACIONAL RESOLUTIVO
     if setor_atual == "MENU_INICIAL":
-        if any(p in texto for p in ["2", "suporte", "tecnico", "técnico", "defeito", "erro", "formatar", "pc", "computador", "notebook", "lento", "windows", "ajuda", "conserto", "travando", "engasgando", "oscilando", "fora do ar", "tela preta", "sem som"]):
-            novo_setor = "SETOR_2_SUPORTE"
-            atendente = "Lucas"
-            baloes, notif = diagnosticar_suporte_lucas(pnome, nome, telefone, mensagem, tipo_midia, texto_comprovante)
-            if notif:
-                dados_extras["notificacao_jonas"] = notif
-        elif any(p in texto for p in ["1", "tv", "iptv", "cinepro", "teste", "testar", "futebol", "canais", "filme", "série", "serie", "jogo", "pacote vip", "radio", "rádio"]):
-            novo_setor = "SETOR_1_CINEPRO"
-            atendente = "Camila"
-            agora = agora_brasilia()
-            dados_extras["teste_iniciado_em"] = agora.strftime("%Y-%m-%d %H:%M:%S")
-            baloes = [
-                f"Oi{virgula_nome}! Tudo bom? Aqui é a Camila 😊 Separei o link direto da nossa Central de TV Aberta, Notícias e Rádios Online com 200 canais gratuitos:",
-                f"É só tocar nesse link aqui pra abrir direto no navegador (celular, computador ou Smart TV):\n{LINK_PLAYER_IPTV}\n\nSão canais abertos públicos e rádios selecionados para rodar bem leve e sem travar (não inclui pacotes pagos fechados). Abre aí e me conta se gostou!"
-            ]
-        elif any(p in texto for p in ["3", "venda", "comercial", "comprar", "preco", "preço", "sistema", "pdv", "caixa", "estoque", "150", "quanto custa", "valor", "tabela", "robô", "robo", "mercadinho", "loja", "comercio", "comércio", "orçamento", "orcamento", "serviços", "servicos", "sistemas", "frota", "locadora"]):
-            novo_setor = "SETOR_3_COMERCIAL"
-            atendente = "Marcos"
-            baloes = [
-                f"Opa{virgula_nome}! Tudo bem? Aqui é o Marcos, trabalho na parte comercial junto com o Jonas.",
-                "Me conta rapidinho o que você tá buscando melhorar hoje pra eu te indicar o caminho certo: é nosso Sistema PDV + Estoque + Ponto de Equilíbrio & Frotas na Nuvem (R$ 150 implantação), Otimização de computador ou Atendimento Online 24h?"
-            ]
-        elif any(p in texto for p in ["4", "jonas", "humano", "pessoa", "dono"]):
+        if eh_intencao_humano:
             novo_setor = "SETOR_4_JONAS_HUMANO"
             atendente = "Equipe do Jonas"
             dados_extras["avisou_aguardo_humano"] = False
@@ -770,6 +761,28 @@ def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tip
             baloes = [
                 f"Pode deixar{virgula_nome}! Já dei um toque no celular pessoal do Jonas pra ele assumir nossa conversa aqui.",
                 "Se quiser, já pode ir mandando sua dúvida por escrito que assim que ele pegar no aparelho já te responde direto, combinado?"
+            ]
+        elif eh_intencao_pdv_comercial or any(p in texto for p in ["venda", "comercial", "comprar", "preco", "preço", "sistema", "caixa", "quanto custa", "valor", "tabela", "serviços", "servicos", "sistemas"]):
+            novo_setor = "SETOR_3_COMERCIAL"
+            atendente = "Marcos"
+            baloes = [
+                f"Opa{virgula_nome}! Tudo bem? Aqui é o Marcos, trabalho na parte comercial junto com o Jonas.",
+                "Me conta rapidinho o que você tá buscando melhorar hoje pra eu te indicar o caminho certo: é nosso Sistema PDV + Estoque + Ponto de Equilíbrio & Frotas na Nuvem (R$ 150 implantação), Otimização de computador ou Atendimento Online 24h?"
+            ]
+        elif eh_intencao_suporte or any(p in texto for p in ["pc", "computador", "notebook", "lento", "windows", "ajuda", "conserto"]):
+            novo_setor = "SETOR_2_SUPORTE"
+            atendente = "Lucas"
+            baloes, notif = diagnosticar_suporte_lucas(pnome, nome, telefone, mensagem, tipo_midia, texto_comprovante)
+            if notif:
+                dados_extras["notificacao_jonas"] = notif
+        elif eh_intencao_tv or any(p in texto for p in ["teste", "testar", "futebol", "filme", "série", "serie", "jogo"]):
+            novo_setor = "SETOR_1_CINEPRO"
+            atendente = "Camila"
+            agora = agora_brasilia()
+            dados_extras["teste_iniciado_em"] = agora.strftime("%Y-%m-%d %H:%M:%S")
+            baloes = [
+                f"Oi{virgula_nome}! Tudo bom? Aqui é a Camila 😊 Separei o link direto da nossa Central de TV Aberta, Notícias e Rádios Online com 200 canais gratuitos:",
+                f"É só tocar nesse link aqui pra abrir direto no navegador (celular, computador ou Smart TV):\n{LINK_PLAYER_IPTV}\n\nSão canais abertos públicos e rádios selecionados para rodar bem leve e sem travar (não inclui pacotes pagos fechados). Abre aí e me conta se gostou!"
             ]
         else:
             novo_setor = "MENU_INICIAL"
