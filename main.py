@@ -13,12 +13,14 @@ Recursos Ativos:
 """
 
 import hashlib
+import json
 import os
 import random
 import re
 import unicodedata
 import urllib.parse
-from datetime import datetime, timedelta
+import urllib.request
+from datetime import datetime, timedelta, timezone
 from flask import Flask, request, jsonify
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
@@ -208,6 +210,52 @@ def gerar_credenciais_cinepro(telefone, nome, valor_pago=30.0, resumo_comprovant
     return usuario, senha, expira_dt.strftime("%d/%m/%Y")
 
 
+def conferir_pix_mercadopago(valor_esperado):
+    """
+    Consulta a API oficial do Mercado Pago para conferir se o pagamento PIX
+    caiu na conta do Jonas nos últimos 90 minutos.
+    Requer MERCADO_PAGO_ACCESS_TOKEN configurado nas variáveis de ambiente.
+    """
+    token = os.environ.get("MERCADO_PAGO_ACCESS_TOKEN") or os.environ.get("MP_ACCESS_TOKEN")
+    if not token:
+        return {"consultado": False, "motivo": "TOKEN_NAO_CONFIGURADO"}
+    try:
+        url = "https://api.mercadopago.com/v1/payments/search?sort=date_created&criteria=desc&limit=15"
+        req = urllib.request.Request(
+            url,
+            headers={
+                "Authorization": f"Bearer {token.strip()}",
+                "Content-Type": "application/json"
+            }
+        )
+        with urllib.request.urlopen(req, timeout=6) as resp:
+            dados = json.loads(resp.read().decode("utf-8"))
+
+        resultados = dados.get("results") or []
+        agora_utc = datetime.now(timezone.utc)
+        for pag in resultados:
+            if pag.get("status") == "approved":
+                valor_pag = float(pag.get("transaction_amount") or 0)
+                if abs(valor_pag - float(valor_esperado)) <= 0.05:
+                    data_criado_str = pag.get("date_created")
+                    if data_criado_str:
+                        dt_pag = datetime.fromisoformat(data_criado_str.replace("Z", "+00:00"))
+                        diferenca_min = (agora_utc - dt_pag).total_seconds() / 60
+                        if diferenca_min <= 90:
+                            return {
+                                "consultado": True,
+                                "aprovado_banco": True,
+                                "id_pagamento": pag.get("id"),
+                                "metodo": pag.get("payment_method_id"),
+                                "valor": valor_pag,
+                                "detalhes": pag.get("description", "")
+                            }
+        return {"consultado": True, "aprovado_banco": False, "motivo": "NAO_ENCONTRADO_NO_EXTRATO"}
+    except Exception as e:
+        print(f"[ERRO API MERCADO PAGO]: {e}")
+        return {"consultado": True, "aprovado_banco": False, "erro": str(e)}
+
+
 def analisar_comprovante_pix(texto_ocr, texto_msg, setor_atual):
     """Analisa texto extraído de imagem/PDF de comprovante PIX e evita reuso."""
     combinado = f"{texto_ocr or ''} {texto_msg or ''}".lower()
@@ -239,12 +287,21 @@ def analisar_comprovante_pix(texto_ocr, texto_msg, setor_atual):
         except Exception as e:
             print(f"[ERRO CHECAR COMPROVANTE]: {e}")
 
-    aprovado = bool(tem_titular_jonas and tem_sinal_pix and not ja_usado)
+    validacao_banco = conferir_pix_mercadopago(valor_detectado)
+    if validacao_banco.get("aprovado_banco"):
+        aprovado = True
+        origem_validacao = "BANCO_MERCADO_PAGO_API"
+    else:
+        aprovado = bool(tem_titular_jonas and tem_sinal_pix and not ja_usado)
+        origem_validacao = "OCR_TESSERACT_COMPROVANTE"
+
     return {
         "aprovado_automatico": aprovado,
         "ja_usado": ja_usado,
         "valor": valor_detectado,
-        "chave_unica": chave_unica
+        "chave_unica": chave_unica,
+        "validacao_banco": validacao_banco,
+        "origem_validacao": origem_validacao
     }
 
 
@@ -378,6 +435,73 @@ def diagnosticar_suporte_lucas(pnome, nome, telefone, mensagem, tipo_midia, text
         "Me conta o que tá acontecendo aí: é algum canal oscilando, configuração na TV ou algo no computador? Pode me explicar do seu jeito ou mandar foto da tela que já vejo pra você!"
     ]
     return baloes, notificacao
+
+
+def gerar_resposta_fallback_inteligente(setor, pnome, mensagem_usuario):
+    """
+    Gera resposta humana e contextual quando o cliente envia mensagens
+    que fogem do padrão das palavras-chave exatas, mantendo a persona de cada setor.
+    """
+    virgula_nome = f", {pnome}" if pnome else ""
+    texto_limpo = normalizar_ascii((mensagem_usuario or "").lower())
+
+    # Dúvidas de Aparelhos / Compatibilidade
+    if any(k in texto_limpo for k in ["roku", "fire stick", "firestick", "smart", "samsung", "lg", "tcl", "celular", "iphone", "computador", "notebook", "tv box", "box", "aparelho"]):
+        if setor == "SETOR_1_CINEPRO":
+            return [
+                f"Funciona sim com excelente qualidade{virgula_nome}! 📺",
+                "O CinePro roda perfeitamente em Smart TVs (Samsung, LG, TCL, Android TV), TV Box, Fire Stick, celular e computador através de um aplicativo super leve.",
+                "Quer que eu te mande o teste grátis de 2 horas agora pra você ver funcionando aí na sua tela?"
+            ]
+        else:
+            return [
+                f"Com certeza{virgula_nome}! Todos os nossos sistemas são otimizados pra rodar super leves sem travar a sua máquina.",
+                "Você prefere conhecer o sistema PDV pra comércio ou os nossos planos de canais e filmes na TV?"
+            ]
+
+    # Dúvidas de Pagamento / Cartão / Parcelamento
+    if any(k in texto_limpo for k in ["cartao", "credito", "debito", "parcel", "vezes", "boleto", "dinheiro"]):
+        return [
+            f"Trabalhamos preferencialmente com PIX{virgula_nome}, que ativa na hora com confirmação automática!",
+            "Se você precisar de link de cartão ou parcelamento, eu anoto aqui e o Jonas te envia o link do Mercado Pago em seguida, tudo bem?\n\nQuer que eu já prepare a sua ativação?"
+        ]
+
+    # Dúvidas sobre Internet / Modo Offline
+    if any(k in texto_limpo for k in ["sem internet", "caiu a net", "offline", "precisa de net"]):
+        if setor == "SETOR_3_COMERCIAL":
+            return [
+                f"Essa é uma das maiores vantagens do nosso PDV{virgula_nome}:",
+                "Ele roda direto no seu computador local! Se a internet cair, o seu caixa continua vendendo e registrando o estoque normalmente sem parar a sua loja. Quando a rede volta, ele sincroniza tudo.",
+                "Quer que eu te mande a chave PIX de R$ 150 pra já liberar a sua licença vitalícia?"
+            ]
+
+    # Cumprimentos e gírias informais
+    if any(k in texto_limpo for k in ["salve", "tranquilo", "beleza", "e ai", "fala ai", "opa tudo bem", "opa"]):
+        return [
+            f"Opa{virgula_nome}, tudo tranquilo por aqui e com você? 🚀",
+            "Como posso te ajudar hoje? Temos o teste grátis da CinePro TV por 2 horas e também os nossos sistemas comerciais para comércio e suporte técnico!"
+        ]
+
+    # Fallback contextual por setor
+    if setor == "SETOR_1_CINEPRO":
+        return [
+            f"Entendi perfeitamente o que você precisa{virgula_nome}! 😊",
+            "Aqui no CinePro TV você tem mais de 4.000 canais abertos e fechados, além de todos os lançamentos de filmes e séries por apenas R$ 30 mensais, sem fidelidade.",
+            "Posso já gerar o seu teste de 2 horas pra você experimentar sem pagar nada?"
+        ]
+    elif setor == "SETOR_2_SUPORTE":
+        return [
+            f"Compreendi o seu relato{virgula_nome}. Sou o Lucas do suporte técnico especializado.",
+            "Para eu te orientar com precisão: o problema está acontecendo na conexão de rede (Wi-Fi), em algum canal específico ou no aplicativo da sua TV?"
+        ]
+    elif setor == "SETOR_3_COMERCIAL":
+        return [
+            f"Perfeito{virgula_nome}! Sou o Marcos do comercial da Jonas Tech.",
+            "Nós desenvolvemos o Sistema PDV Frente de Caixa (pagamento único de R$ 150, sem mensalidades) e o Combo de Modernização completo.",
+            "Me conta um pouco do seu comércio ou da sua ideia pra eu te indicar a melhor opção!"
+        ]
+
+    return obter_recepcao_natural(pnome)
 
 
 def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tipo_midia="text", texto_comprovante=""):
@@ -646,10 +770,7 @@ def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tip
                 "Aproveita bastante o teste! Se já quiser deixar o mês completo garantido por R$ 30, é só me pedir o PIX por aqui, tá bom?"
             ]
         else:
-            baloes = [
-                f"Me conta aí{virgula_nome}, conseguiu abrir o link da programação no seu aparelho?",
-                "Qualquer dúvida na configuração ou se quiser ativar o acesso mensal de R$ 30, é só me chamar aqui!"
-            ]
+            baloes = gerar_resposta_fallback_inteligente("SETOR_1_CINEPRO", pnome, mensagem)
 
     elif setor_atual == "SETOR_2_SUPORTE":
         atendente = "Lucas"
@@ -682,10 +803,7 @@ def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tip
                 "Quer que eu já valide essa condição de R$ 350 e te mande a chave PIX oficial?"
             ]
         else:
-            baloes = [
-                "Aqui todas as nossas soluções de sistema têm pagamento único, sem mensalidade prendendo você, e já vão com acompanhamento pra deixar rodando redondo.",
-                "Quer que eu valide a proposta de R$ 150 pra você testar na prática hoje mesmo e já te passe a chave PIX?"
-            ]
+            baloes = gerar_resposta_fallback_inteligente("SETOR_3_COMERCIAL", pnome, mensagem)
 
     elif setor_atual == "SETOR_4_JONAS_HUMANO":
         atendente = "Equipe do Jonas"
@@ -698,7 +816,7 @@ def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tip
     else:
         novo_setor = "MENU_INICIAL"
         atendente = "Recepção Jonas Tech"
-        baloes = obter_recepcao_natural(pnome)
+        baloes = gerar_resposta_fallback_inteligente("MENU_INICIAL", pnome, mensagem)
 
     return novo_setor, atendente, baloes, dados_extras
 
@@ -708,14 +826,15 @@ def healthcheck():
     return jsonify({
         "status": "online",
         "servico": "Central Humana & Relatórios 24/7 - Jonas Tech Solutions",
-        "versao": "5.0_VITRINE_AUSENCIA_EMAIL",
+        "versao": "6.0_AUTOMACOES_MERCADOPAGO_FALLBACK",
         "banco": "MongoDB Atlas Conectado",
         "recursos_ativos": [
-            "1. Atendimento 100% Natural (Sem Menu URA)",
-            "2. Camila: PIX Blindado + OCR/PDF + Login 30 Dias",
-            "3. Lucas: Diagnóstico Técnico + Registro para E-mail",
-            "4. Marcos: Consultoria Comercial de Melhorias",
-            "5. Relatório Financeiro e Técnico (/api/relatorio-email)"
+            "1. Atendimento 100% Natural com Fallback Contextual",
+            "2. Camila: PIX Blindado + OCR/PDF + API Mercado Pago + Login 30 Dias",
+            "3. Lucas: Diagnóstico Suporte TI + Relatório E-mail",
+            "4. Marcos: Consultoria Comercial + PDV R$ 150 / Combo R$ 350",
+            "5. Keep-Alive Anti-Sleep Ativo 24/7",
+            "6. Automação de E-mail via SMTP Gmail Seguro"
         ],
         "timestamp": agora_brasilia().strftime("%Y-%m-%d %H:%M:%S")
     }), 200
