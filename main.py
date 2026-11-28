@@ -835,21 +835,34 @@ def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tip
     eh_opc_4 = opc_limpa in ["4", "opcao 4", "opção 4"]
 
     texto_sem_acento = normalizar_ascii(texto)
+    eh_chamar_lucas = opc_limpa == "lucas" or any(p in texto_sem_acento for p in [
+        "falar com lucas", "falar com o lucas", "chama o lucas", "chamar lucas",
+        "passa pro lucas", "quero falar com lucas", "quero o lucas"
+    ])
+    eh_chamar_marcos = opc_limpa == "marcos" or any(p in texto_sem_acento for p in [
+        "falar com marcos", "falar com o marcos", "chama o marcos", "chamar marcos",
+        "passa pro marcos", "quero falar com marcos", "quero o marcos"
+    ])
+    eh_chamar_camila = opc_limpa == "camila" or any(p in texto_sem_acento for p in [
+        "falar com camila", "falar com a camila", "chama a camila", "chamar camila",
+        "passa pra camila", "quero falar com camila", "quero a camila"
+    ])
+
     eh_intencao_humano = eh_opc_4 or opc_limpa == "jonas" or any(p in texto_sem_acento for p in ["falar com jonas", "falar com o jonas", "chama o jonas", "atendente humano", "falar com humano", "falar com dono"])
-    eh_intencao_pdv_comercial = eh_opc_3 or any(p in texto_sem_acento for p in [
+    eh_intencao_pdv_comercial = eh_opc_3 or eh_chamar_marcos or any(p in texto_sem_acento for p in [
         "pdv", "sistema de caixa", "estoque", "150", "250", "350", "combo", "frota",
         "locadora", "mercadinho", "loja", "comercio", "orcamento", "automacao",
         "robo", "atendimento online", "atendimento 24", "otimizacao", "windows boost"
     ])
-    eh_intencao_suporte = eh_opc_2 or any(p in texto_sem_acento for p in [
+    eh_intencao_suporte = eh_opc_2 or eh_chamar_lucas or any(p in texto_sem_acento for p in [
         "suporte", "tecnico", "defeito", "erro", "formatar", "pc lento", "computador lento",
         "travando", "engasgando", "oscilando", "tela preta", "sem som", "fora do ar", "canal caiu",
         "parou", "nao funciona", "nao pega", "nao abre", "nao entra", "nao carrega",
         "travou", "caiu", "sumiu", "sem sinal", "colocar na tv", "coloca na tv", "botar na tv",
         "instalar na tv", "como coloca", "todos os canais", "um canal", "um so"
     ])
-    eh_intencao_tv = eh_opc_1 or any(p in texto_sem_acento for p in ["tv", "iptv", "cinepro", "canais", "radio", "aberta"])
-    eh_pedido_explicito_canais_tv = eh_opc_1 or any(p in texto_sem_acento for p in [
+    eh_intencao_tv = eh_opc_1 or eh_chamar_camila or any(p in texto_sem_acento for p in ["tv", "iptv", "cinepro", "canais", "radio", "aberta"])
+    eh_pedido_explicito_canais_tv = eh_opc_1 or eh_chamar_camila or any(p in texto_sem_acento for p in [
         "canais", "tv aberta", "central gratuita", "central de tv", "cinepro",
         "iptv", "radio", "quero testar a tv", "link da tv", "quero abrir a central"
     ])
@@ -861,11 +874,11 @@ def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tip
         or "Lucas" in resposta_anterior_lead
     )
 
-    eh_compra_explicita = eh_opc_3 or any(p in texto_sem_acento for p in [
+    eh_compra_explicita = eh_opc_3 or eh_chamar_marcos or any(p in texto_sem_acento for p in [
         "comprar", "preco", "valor", "quanto custa", "orcamento", "pix", "combo", "150", "250", "350", "assinar", "fechar"
     ])
 
-    if eh_intencao_humano:
+    if eh_intencao_humano or eh_chamar_lucas or eh_chamar_marcos or eh_chamar_camila:
         setor_atual = "MENU_INICIAL"
     elif setor_atual == "SETOR_1_CINEPRO" and (eh_intencao_suporte or eh_intencao_pdv_comercial):
         setor_atual = "MENU_INICIAL"
