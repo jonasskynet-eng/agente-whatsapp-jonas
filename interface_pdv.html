@@ -530,6 +530,113 @@
     .badge-stock-ok { background: rgba(16, 185, 129, 0.15); color: #34d399; }
     .badge-stock-warn { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
     .badge-stock-danger { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+  
+    /* ESTILOS DE PRATICIDADE ULTRA-RÁPIDA */
+    .btn-cedula {
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #38bdf8;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 0.82rem;
+      padding: 6px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .btn-cedula:hover {
+      background: #0284c7;
+      color: #ffffff;
+      border-color: #38bdf8;
+      transform: translateY(-1px);
+    }
+    .btn-desconto {
+      background: rgba(245, 158, 11, 0.1);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      color: #fbbf24;
+      font-weight: 700;
+      font-size: 0.75rem;
+      padding: 4px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .btn-desconto.active, .btn-desconto:hover {
+      background: #f59e0b;
+      color: #000;
+    }
+    .btn-pill-cat {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: var(--text-muted);
+      font-size: 0.78rem;
+      padding: 4px 10px;
+      border-radius: 20px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s ease;
+    }
+    .btn-pill-cat.active, .btn-pill-cat:hover {
+      background: #10b981;
+      color: #000;
+      font-weight: 700;
+      border-color: #10b981;
+    }
+    .btn-qtd {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #fff;
+      width: 24px;
+      height: 24px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 800;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.1s;
+    }
+    .btn-qtd:hover {
+      background: #3b82f6;
+      border-color: #60a5fa;
+    }
+    .btn-lixeira {
+      background: none;
+      border: none;
+      color: #ef4444;
+      cursor: pointer;
+      font-size: 1rem;
+      padding: 2px 6px;
+      border-radius: 4px;
+      transition: background 0.1s;
+    }
+    .btn-lixeira:hover {
+      background: rgba(239, 68, 68, 0.15);
+    }
+    /* MODAL DE CÂMERA & PRODUTO */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(8px);
+      z-index: 100;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.active {
+      display: flex;
+    }
+    .modal-box {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 1.5rem;
+      max-width: 480px;
+      width: 90%;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+    }
+
   </style>
 </head>
 <body>
@@ -569,106 +676,188 @@
     <section id="pane-pdv" class="tab-pane active">
       <div class="pdv-layout">
         
-        <!-- LADO ESQUERDO: SCANNER E ITENS -->
+        <!-- LADO ESQUERDO: SCANNER, TOQUE RÁPIDO E ITENS -->
         <div class="card">
-          <div class="scanner-box">
-            <div class="scanner-input-wrap">
+          <!-- BARRA DE SCANNER COM LEITOR, CÂMERA E NOVO PRODUTO -->
+          <div class="scanner-box" style="display:flex; gap:8px; align-items:center;">
+            <div class="scanner-input-wrap" style="flex:1;">
               <span>🔍</span>
-              <input type="text" id="inputCodigo" class="scanner-input" placeholder="Passe o leitor ou digite o código de barras (Ex: 7891000100103) + ENTER" autofocus>
+              <input type="text" id="inputCodigo" class="scanner-input" placeholder="Bipe o código de barras ou digite o nome/SKU + ENTER" autofocus>
             </div>
-            <button class="btn" onclick="adicionarPorCodigo()">Inserir (Enter)</button>
+            <button class="btn" onclick="adicionarPorCodigo()" style="white-space:nowrap;">Enter</button>
+            <button class="btn btn-secondary" onclick="abrirCameraScanner()" style="white-space:nowrap; background:#0284c7; border-color:#38bdf8;" title="Ler código com a câmera do celular/webcam">
+              📸 Câmera
+            </button>
+            <button class="btn btn-secondary" onclick="abrirModalProdutoRapido()" style="white-space:nowrap; background:#8b5cf6; border-color:#a855f7;" title="Cadastrar produto novo em 5 segundos">
+              ➕ Produto
+            </button>
           </div>
 
-          <!-- GRADE TOQUE RÁPIDO (PRODUTOS MAIS VENDIDOS BALCÃO) -->
-          <div style="margin-bottom: 1.25rem; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 0.85rem;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 0.6rem;">
+          <!-- FILTROS POR CATEGORIA & GRADE TOQUE RÁPIDO -->
+          <div style="margin-bottom: 1rem; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 0.85rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 0.6rem; flex-wrap:wrap; gap:8px;">
               <strong style="color: #38bdf8; font-size: 0.88rem; display:flex; align-items:center; gap: 6px;">
                 ⚡ Toque Rápido Balcão (1 Clique Adiciona)
               </strong>
-              <span style="font-size: 0.75rem; color: #94a3b8;">Mais vendidos sem leitor</span>
+              <div style="display:flex; gap:6px; overflow-x:auto;">
+                <button class="btn-pill-cat active" onclick="filtrarGradeFastTouch('Todos', this)">Todos</button>
+                <button class="btn-pill-cat" onclick="filtrarGradeFastTouch('Acessórios', this)">Acessórios</button>
+                <button class="btn-pill-cat" onclick="filtrarGradeFastTouch('Eletrônicos', this)">Eletrônicos</button>
+                <button class="btn-pill-cat" onclick="filtrarGradeFastTouch('Hardware', this)">Hardware</button>
+                <button class="btn-pill-cat" onclick="filtrarGradeFastTouch('Serviços', this)">Serviços & TV</button>
+              </div>
             </div>
             <div id="gradeFastTouch" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px;">
               <!-- Preenchido dinamicamente via JS -->
             </div>
           </div>
 
-          <div class="cart-table-wrap">
+          <!-- TABELA DE ITENS NO CARRINHO -->
+          <div class="cart-table-wrap" style="max-height: 380px; overflow-y: auto;">
             <table>
               <thead>
-                <tr>
-                  <th style="width: 50px;">Item</th>
+                <tr style="position: sticky; top: 0; background: var(--card-bg); z-index: 2;">
+                  <th style="width: 40px;">#</th>
                   <th>Descrição do Produto</th>
-                  <th style="width: 120px;">Qtd</th>
-                  <th style="width: 100px;">Unitário</th>
-                  <th style="width: 110px;">Subtotal</th>
-                  <th style="width: 50px;">Ação</th>
+                  <th style="width: 140px; text-align:center;">Qtd</th>
+                  <th style="width: 90px; text-align:right;">Unitário</th>
+                  <th style="width: 100px; text-align:right;">Subtotal</th>
+                  <th style="width: 45px; text-align:center;">Ação</th>
                 </tr>
               </thead>
               <tbody id="cartTableBody">
-                <!-- Inserido dinamicamente via JS -->
+                <!-- Inserido dinamicamente via JS com controles rápidos -->
               </tbody>
             </table>
           </div>
 
-          <div style="margin-top: 1rem; display: flex; justify-content: space-between; align-items: center; color: var(--text-muted); font-size: 0.85rem;">
-            <span>Atalhos: <strong>Enter</strong> Adicionar | <strong>F4</strong> Finalizar Venda | <strong>F2</strong> Nova Venda</span>
-            <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.8rem;" onclick="limparCarrinho()">🗑 Limpar Venda</button>
+          <!-- RODAPÉ COM ATALHOS E LIMPEZA -->
+          <div style="margin-top: 1rem; display: flex; justify-content: space-between; align-items: center; color: var(--text-muted); font-size: 0.85rem; flex-wrap: wrap; gap: 8px;">
+            <div style="display:flex; align-items:center; gap:12px;">
+              <span>Atalhos: <strong>Enter</strong> Adicionar | <strong>F4</strong> Finalizar | <strong>F2</strong> Nova Venda</span>
+              <button id="btnAlternarSom" onclick="alternarSomPDV()" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.75rem;">🔊 Som Ativo</button>
+            </div>
+            <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.8rem; background:rgba(239,68,68,0.2); border-color:#ef4444; color:#fca5a5;" onclick="limparCarrinho()">
+              🗑 Limpar Carrinho
+            </button>
           </div>
         </div>
 
-        <!-- LADO DIREITO: TOTAIS E PAGAMENTO -->
+        <!-- LADO DIREITO: TOTAIS, CLIENTE, DESCONTOS E FORMAS DE PAGAMENTO -->
         <div class="card checkout-panel">
-          <div class="display-total">
-            <span>Total da Compra</span>
-            <h2 id="displayTotalLiquido">R$ 0,00</h2>
+          
+          <!-- SELETOR DE CLIENTE CRM & FIADO -->
+          <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--card-border); border-radius: 8px; padding: 0.7rem; margin-bottom: 0.8rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 4px;">
+              <label style="font-size: 0.8rem; font-weight: 700; color: #38bdf8;">👤 Cliente da Venda (CRM):</label>
+              <button onclick="carregarListaClientesPDV()" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:0.75rem;" title="Recarregar clientes">🔄</button>
+            </div>
+            <select id="selectClientePDV" onchange="aoSelecionarClientePDV()" class="input-form" style="width: 100%; font-size: 0.85rem; padding: 6px;">
+              <option value="">Consumidor Balcão (Padrão)</option>
+            </select>
+            <div id="infoClienteFiado" style="display:none; font-size: 0.75rem; margin-top: 4px; color: #34d399;">
+              Limite: <strong id="lblLimiteCliente">R$ 0,00</strong> | Em Aberto: <strong id="lblSaldoCliente" style="color:#ef4444;">R$ 0,00</strong>
+            </div>
           </div>
 
+          <!-- DISPLAY DE TOTAL COM DESCONTO -->
+          <div class="display-total" style="padding: 1rem;">
+            <div style="display:flex; justify-content:space-between; font-size:0.85rem; color:var(--text-muted);">
+              <span>Subtotal: <strong id="lblSubtotalBruto">R$ 0,00</strong></span>
+              <span id="lblDescontoAplicado" style="color:#fbbf24;">Desconto: R$ 0,00</span>
+            </div>
+            <span style="font-size:0.85rem; margin-top:4px; display:block;">Total Líquido a Pagar</span>
+            <h2 id="displayTotalLiquido" style="font-size:2.2rem; margin-top:2px;">R$ 0,00</h2>
+          </div>
+
+          <!-- BOTÕES RÁPIDOS DE DESCONTO -->
+          <div style="margin-bottom: 0.8rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 4px;">
+              <span style="font-size:0.75rem; color:var(--text-muted); font-weight:700;">🏷️ Desconto Rápido:</span>
+              <span id="txtInfoDesconto" style="font-size:0.75rem; color:#fbbf24;">0%</span>
+            </div>
+            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+              <button class="btn-desconto active" onclick="aplicarDescontoRapido(0, 'pct')">0%</button>
+              <button class="btn-desconto" onclick="aplicarDescontoRapido(5, 'pct')">5% OFF</button>
+              <button class="btn-desconto" onclick="aplicarDescontoRapido(10, 'pct')">10% OFF</button>
+              <button class="btn-desconto" onclick="aplicarDescontoRapido(5, 'val')">R$ 5</button>
+              <button class="btn-desconto" onclick="aplicarDescontoRapido(10, 'val')">R$ 10</button>
+              <input type="number" id="inputDescontoPersonalizado" oninput="aplicarDescontoManual(this.value)" placeholder="R$..." style="width:65px; background:rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,0.2); border-radius:4px; color:#fff; font-size:0.75rem; padding:2px 6px; text-align:right;">
+            </div>
+          </div>
+
+          <!-- FORMAS DE PAGAMENTO (INCLUINDO FIADO / A PRAZO) -->
           <div>
-            <label style="font-size: 0.85rem; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 6px;">Forma de Pagamento</label>
-            <div class="payment-methods">
+            <label style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 4px;">Forma de Pagamento</label>
+            <div class="payment-methods" style="grid-template-columns: repeat(4, 1fr); gap:6px;">
               <button type="button" class="pay-btn selected" id="btnPayPIX" onclick="selecionarFormaPagamento('PIX')">
-                <span style="font-size: 1.3rem;">💠</span>
-                <span>PIX QR Code</span>
+                <span style="font-size: 1.1rem;">💠</span>
+                <span style="font-size:0.75rem;">PIX QR</span>
               </button>
               <button type="button" class="pay-btn" id="btnPayDinheiro" onclick="selecionarFormaPagamento('DINHEIRO')">
-                <span style="font-size: 1.3rem;">💵</span>
-                <span>Dinheiro</span>
+                <span style="font-size: 1.1rem;">💵</span>
+                <span style="font-size:0.75rem;">Dinheiro</span>
               </button>
               <button type="button" class="pay-btn" id="btnPayCartao" onclick="selecionarFormaPagamento('CARTAO_DEBITO')">
-                <span style="font-size: 1.3rem;">💳</span>
-                <span>Cartão</span>
+                <span style="font-size: 1.1rem;">💳</span>
+                <span style="font-size:0.75rem;">Cartão</span>
+              </button>
+              <button type="button" class="pay-btn" id="btnPayFiado" onclick="selecionarFormaPagamento('FIADO')">
+                <span style="font-size: 1.1rem;">📑</span>
+                <span style="font-size:0.75rem;">Fiado</span>
               </button>
             </div>
           </div>
 
-          <!-- BOX DINHEIRO / TROCO -->
-          <div id="boxDinheiro" class="troco-box" style="display: none;">
-            <div class="form-row">
-              <span>Valor Recebido:</span>
-              <input type="number" id="inputValorRecebido" class="form-input-sm" value="0.00" step="0.50" oninput="calcularTroco()">
+          <!-- BOX DINHEIRO / CÉDULAS RÁPIDAS E TROCO -->
+          <div id="boxDinheiro" class="troco-box" style="display: none; margin-top: 0.8rem; background:rgba(15,23,42,0.9); border:1px solid #0284c7; border-radius:8px; padding:0.85rem;">
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 6px; font-weight:700;">💵 Cédulas Rápidas Recebidas:</div>
+            <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px;">
+              <button class="btn-cedula" onclick="preencherCedulaRecebida(0)">Exato</button>
+              <button class="btn-cedula" onclick="preencherCedulaRecebida(10)">R$ 10</button>
+              <button class="btn-cedula" onclick="preencherCedulaRecebida(20)">R$ 20</button>
+              <button class="btn-cedula" onclick="preencherCedulaRecebida(50)">R$ 50</button>
+              <button class="btn-cedula" onclick="preencherCedulaRecebida(100)">R$ 100</button>
+              <button class="btn-cedula" onclick="preencherCedulaRecebida(200)">R$ 200</button>
             </div>
-            <div class="form-row" style="font-weight: 800; color: #34d399; margin-bottom: 0;">
-              <span>Troco a Devolver:</span>
-              <span id="labelTroco" style="font-family: var(--font-mono); font-size: 1.2rem;">R$ 0,00</span>
+            <div class="form-row" style="margin-bottom:6px;">
+              <span style="font-size:0.85rem;">Valor Entregue pelo Cliente:</span>
+              <input type="number" id="inputValorRecebido" class="form-input-sm" value="0.00" step="1.00" oninput="calcularTroco()" style="font-size:1.1rem; font-weight:800; width:110px;">
+            </div>
+            <div class="form-row" style="font-weight: 800; color: #34d399; margin-bottom: 0; background:rgba(16,185,129,0.1); padding:6px 10px; border-radius:6px;">
+              <span style="font-size:0.9rem;">TROCO A DEVOLVER:</span>
+              <span id="labelTroco" style="font-family: var(--font-mono); font-size: 1.4rem; color:#4ade80;">R$ 0,00</span>
             </div>
           </div>
 
           <!-- BOX PIX -->
-          <div id="boxPIX" class="pix-box" style="display: block;">
-            <div style="font-weight: 700; color: #34d399; font-size: 0.9rem;">📱 Aproxime o celular para pagar no PIX</div>
+          <div id="boxPIX" class="pix-box" style="display: block; margin-top:0.8rem;">
+            <div style="font-weight: 700; color: #34d399; font-size: 0.85rem;">📱 Aproxime o celular para pagar no PIX</div>
             <img id="imgQrcodePDV" class="pix-qrcode" src="" alt="QR Code PIX">
-            <div style="font-size: 0.75rem; color: var(--text-muted);">Chave Oficial: <strong>324588e6-bd74-4b6d-9951-5321cc50ea5a</strong></div>
+            <div style="font-size: 0.72rem; color: var(--text-muted);">Titular: <strong>Jonas Mendonça</strong> (Mercado Pago)</div>
             <div class="pix-code-text" id="textPixPDV">Aguardando itens para gerar QR Code...</div>
             <button class="btn btn-secondary" style="width: 100%; font-size: 0.8rem; padding: 6px;" onclick="copiarPixPDV()">📋 Copiar Código PIX</button>
           </div>
 
-          <button class="btn" style="width: 100%; padding: 16px; font-size: 1.1rem;" onclick="finalizarVenda()">
+          <!-- BOX FIADO / A PRAZO -->
+          <div id="boxFiado" style="display: none; margin-top:0.8rem; background:rgba(139,92,246,0.1); border:1px solid #8b5cf6; border-radius:8px; padding:0.85rem;">
+            <strong style="color:#c084fc; font-size:0.85rem; display:block; margin-bottom:4px;">📑 Compra a Prazo / Fiado Seguro</strong>
+            <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:6px;">
+              O total da compra será lançado automaticamente no saldo devedor do cliente cadastrado.
+            </p>
+            <div id="statusFiadoAutorizado" style="font-size:0.8rem; font-weight:700; color:#34d399;">
+              ✅ Limite de crédito verificado e aprovado.
+            </div>
+          </div>
+
+          <!-- BOTÃO FINALIZAR VENDA -->
+          <button class="btn" style="width: 100%; padding: 14px; font-size: 1.1rem; margin-top: 1rem; font-weight:800; background:linear-gradient(135deg, #10b981, #059669);" onclick="finalizarVenda()">
             ✅ FINALIZAR VENDA (F4)
           </button>
 
-          <!-- RECIBO TERMICO APOS VENDA -->
-          <div id="reciboTermico" class="cupom-recibo">
-            <!-- Gerado via JS -->
+          <!-- RECIBO TÉRMICO E AÇÕES PÓS-VENDA -->
+          <div id="reciboTermico" class="cupom-recibo" style="margin-top: 1rem;">
+            <!-- Gerado dinamicamente via JS com botões de WhatsApp e impressão -->
           </div>
         </div>
 
@@ -1125,6 +1314,7 @@
       event.currentTarget.classList.add('active');
 
       if (abaId === 'estoque') carregarEstoque();
+      carregarListaClientesPDV();
       if (abaId === 'fechamento') carregarStatusCaixa();
       if (abaId === 'equilibrio') carregarMetricasFinanceiras();
       if (abaId === 'clientes') carregarClientes();
@@ -1144,7 +1334,9 @@
         const res = await fetch(`/api/produtos/${codigo}`);
         if (!res.ok) {
           emitirBipLeitor(false);
-          alert(`Produto com código [${codigo}] não encontrado no catálogo.`);
+          if (confirm(`Produto [${codigo}] não localizado no catálogo! Deseja cadastrar agora em 5 segundos?`)) {
+            abrirModalProdutoRapido(codigo);
+          }
           input.value = '';
           return;
         }
@@ -1196,684 +1388,144 @@
       const tbody = document.getElementById('cartTableBody');
       tbody.innerHTML = '';
 
-      let total = 0;
+      if (carrinho.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:30px; color:var(--text-muted);">Carrinho vazio. Bipe um produto, use o toque rápido ou a câmera.</td></tr>';
+        renderizarTotaisNaTela();
+        return;
+      }
+
       carrinho.forEach((item, idx) => {
         const subtotal = item.quantidade * item.preco_unitario;
-        total += subtotal;
-
         const tr = document.createElement('tr');
+        tr.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
         tr.innerHTML = `
-          <td style="color:var(--text-muted); font-family:var(--font-mono);">${idx + 1}</td>
+          <td style="color:var(--text-muted); font-family:var(--font-mono); font-size:0.8rem;">${idx + 1}</td>
           <td>
-            <strong>${item.nome}</strong><br>
-            <small style="color:var(--text-muted); font-family:var(--font-mono);">${item.codigo_barras}</small>
+            <strong style="font-size:0.9rem;">${item.nome}</strong>
+            <div style="font-size:0.75rem; color:var(--text-muted); font-family:var(--font-mono);">${item.sku || item.codigo_barras}</div>
           </td>
-          <td>
-            <div style="display:flex; align-items:center; gap:6px;">
-              <button class="qty-btn" onclick="alterarQtd(${idx}, -1)">-</button>
-              <span style="font-family:var(--font-mono); font-weight:700; width:24px; text-align:center;">${item.quantidade}</span>
-              <button class="qty-btn" onclick="alterarQtd(${idx}, 1)">+</button>
+          <td style="text-align:center;">
+            <div style="display:inline-flex; align-items:center; gap:6px;">
+              <button class="btn-qtd" onclick="alterarQuantidadeItem(${idx}, -1)" title="Diminuir">➖</button>
+              <span style="font-family:var(--font-mono); font-weight:800; min-width:24px; text-align:center;">${item.quantidade}</span>
+              <button class="btn-qtd" onclick="alterarQuantidadeItem(${idx}, 1)" title="Aumentar">➕</button>
             </div>
           </td>
-          <td style="font-family:var(--font-mono);">R$ ${item.preco_unitario.toFixed(2)}</td>
-          <td style="font-family:var(--font-mono); font-weight:800; color:#34d399;">R$ ${subtotal.toFixed(2)}</td>
-          <td>
-            <button class="btn btn-danger" style="padding:4px 8px; font-size:0.75rem;" onclick="removerItem(${idx})">✕</button>
+          <td style="font-family:var(--font-mono); text-align:right; font-size:0.85rem;">R$ ${item.preco_unitario.toFixed(2)}</td>
+          <td style="font-family:var(--font-mono); font-weight:800; color:#38bdf8; text-align:right; font-size:0.95rem;">R$ ${subtotal.toFixed(2)}</td>
+          <td style="text-align:center;">
+            <button class="btn-lixeira" onclick="removerItemCarrinho(${idx})" title="Remover item">🗑️</button>
           </td>
         `;
         tbody.appendChild(tr);
       });
 
-      document.getElementById('displayTotalLiquido').innerText = `R$ ${total.toFixed(2)}`;
-      calcularTroco();
+      renderizarTotaisNaTela();
+    }
 
-      // Atualizar QR Code PIX em tempo real se a forma for PIX
-      if (formaPagamento === 'PIX' && total > 0) {
-        atualizarPixPDV(total);
-      } else if (total === 0) {
-        document.getElementById('textPixPDV').innerText = 'Aguardando itens para gerar QR Code...';
-        document.getElementById('imgQrcodePDV').src = '';
+    function aplicarDescontoManual(valStr) {
+      const val = parseFloat(valStr) || 0;
+      descontoAtual = { valor: val, tipo: 'val' };
+      document.querySelectorAll('.btn-desconto').forEach(b => b.classList.remove('active'));
+      document.getElementById('txtInfoDesconto').innerText = `R$ ${val.toFixed(2)}`;
+      renderizarTotaisNaTela();
+    }
+
+    function calcularDescontoValor(subtotalBruto) {
+      if (descontoAtual.tipo === 'pct') {
+        return Math.round((subtotalBruto * (descontoAtual.valor / 100)) * 100) / 100;
       }
+      return Math.min(subtotalBruto, Math.max(0, descontoAtual.valor));
     }
 
-    function selecionarFormaPagamento(forma) {
-      formaPagamento = forma;
-      document.querySelectorAll('.pay-btn').forEach(b => b.classList.remove('selected'));
-      
-      if (forma === 'PIX') {
-        document.getElementById('btnPayPIX').classList.add('selected');
-        document.getElementById('boxPIX').style.display = 'block';
-        document.getElementById('boxDinheiro').style.display = 'none';
-        const total = obterTotalCarrinho();
-        if (total > 0) atualizarPixPDV(total);
-      } else if (forma === 'DINHEIRO') {
-        document.getElementById('btnPayDinheiro').classList.add('selected');
-        document.getElementById('boxPIX').style.display = 'none';
-        document.getElementById('boxDinheiro').style.display = 'block';
-        document.getElementById('inputValorRecebido').focus();
-      } else {
-        document.getElementById('btnPayCartao').classList.add('selected');
-        document.getElementById('boxPIX').style.display = 'none';
-        document.getElementById('boxDinheiro').style.display = 'none';
+    function obterTotalBruto() {
+      return carrinho.reduce((acc, it) => acc + (it.quantidade * it.preco_unitario), 0);
+    }
+
+    function obterTotalLiquido() {
+      const bruto = obterTotalBruto();
+      const desc = calcularDescontoValor(bruto);
+      return Math.max(0, bruto - desc);
+    }
+
+    function renderizarTotaisNaTela() {
+      const bruto = obterTotalBruto();
+      const desc = calcularDescontoValor(bruto);
+      const liquido = Math.max(0, bruto - desc);
+
+      document.getElementById('lblSubtotalBruto').innerText = `R$ ${bruto.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
+      document.getElementById('lblDescontoAplicado').innerText = `Desconto: - R$ ${desc.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
+      document.getElementById('displayTotalLiquido').innerText = `R$ ${liquido.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
+
+      if (formaPagamento === 'PIX' && liquido > 0) {
+        atualizarPixPDV(liquido);
       }
-    }
-
-    function obterTotalCarrinho() {
-      return carrinho.reduce((acc, i) => acc + (i.quantidade * i.preco_unitario), 0);
-    }
-
-    function calcularTroco() {
-      const total = obterTotalCarrinho();
-      const recebido = parseFloat(document.getElementById('inputValorRecebido').value) || 0;
-      const troco = Math.max(0, recebido - total);
-      document.getElementById('labelTroco').innerText = `R$ ${troco.toFixed(2)}`;
-    }
-
-    // ATUALIZAR PIX PDV
-    let payloadPixAtual = '';
-    async function atualizarPixPDV(valor) {
-      try {
-        const res = await fetch('/api/pix/gerar', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({ valor: valor })
-        });
-        const data = await res.json();
-        payloadPixAtual = data.payload;
-        document.getElementById('imgQrcodePDV').src = data.qrcode_url;
-        document.getElementById('textPixPDV').innerText = data.payload;
-      } catch (e) {
-        console.error(e);
-      }
-    }
-
-    function copiarPixPDV() {
-      if (!payloadPixAtual) return;
-      navigator.clipboard.writeText(payloadPixAtual);
-      alert('Código PIX Copia-e-Cola copiado com sucesso!');
-    }
-
-    // FINALIZAR VENDA
-    async function finalizarVenda() {
-      if (carrinho.length === 0) {
-        alert('O carrinho está vazio! Insira produtos antes de finalizar.');
-        return;
-      }
-
-      const total = obterTotalCarrinho();
-      let valorPago = total;
       if (formaPagamento === 'DINHEIRO') {
-        const recebido = parseFloat(document.getElementById('inputValorRecebido').value) || 0;
-        if (recebido < total) {
-          alert(`Valor recebido (R$ ${recebido.toFixed(2)}) é menor que o total da venda (R$ ${total.toFixed(2)}).`);
-          return;
-        }
-        valorPago = recebido;
-      }
-
-      try {
-        const res = await fetch('/api/venda', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({
-            itens: carrinho,
-            forma_pagamento: formaPagamento,
-            valor_pago: valorPago,
-            desconto: 0.0
-          })
-        });
-
-        const resultado = await res.json();
-        if (!res.ok) {
-          alert('Erro ao registrar venda: ' + resultado.erro);
-          return;
-        }
-
-        // Emitir recibo termico na tela
-        gerarReciboTermico(resultado);
-        limparCarrinho();
-        emitirBipLeitor(true);
-        alert(`Venda ${resultado.codigo_venda} CONCLUÍDA com sucesso!\nEstoque atualizado e caixa registrado.`);
-      } catch (e) {
-        console.error(e);
-        alert('Erro ao processar venda no servidor.');
+        calcularTroco();
       }
     }
 
-    let ultimaVendaConcluida = null;
-
-    function gerarReciboTermico(venda) {
-      ultimaVendaConcluida = venda;
-      const box = document.getElementById('reciboTermico');
-      box.style.display = 'block';
-      let itensHtml = venda.itens.map(i => 
-        `<div>${i.quantidade}x ${i.nome.padEnd(22, ' ').slice(0, 22)} R$ ${i.subtotal.toFixed(2)}</div>`
-      ).join('');
-
-      box.innerHTML = `
-        <div style="text-align:center; font-weight:bold; margin-bottom:6px;">
-          === JONAS TECH & VARIEDADES ===<br>
-          CNPJ: 00.000.000/0001-99<br>
-          Atendimento: (11) 96670-7293
-        </div>
-        <div style="border-bottom:1px dashed #333; margin:6px 0;"></div>
-        <div>CUPOM NÃO FISCAL: ${venda.codigo_venda}</div>
-        <div>DATA: ${venda.data_hora}</div>
-        <div style="border-bottom:1px dashed #333; margin:6px 0;"></div>
-        ${itensHtml}
-        <div style="border-bottom:1px dashed #333; margin:6px 0;"></div>
-        <div style="font-weight:bold; font-size:14px; display:flex; justify-content:space-between;">
-          <span>TOTAL A PAGAR:</span>
-          <span>R$ ${venda.total_liquido.toFixed(2)}</span>
-        </div>
-        <div>FORMA PGTO: ${venda.forma_pagamento}</div>
-        ${venda.forma_pagamento === 'DINHEIRO' ? `<div>PAGO: R$ ${venda.valor_pago.toFixed(2)} | TROCO: R$ ${(venda.troco || 0).toFixed(2)}</div>` : ''}
-        <div style="border-bottom:1px dashed #333; margin:6px 0;"></div>
-        <div style="text-align:center; margin-top:6px;">Obrigado pela preferência! Volte sempre.</div>
-        <div style="display:flex; gap:8px; margin-top:12px;">
-          <button type="button" onclick="window.print()" style="flex:1; background:#10b981; color:#fff; font-weight:700; padding:8px; border:none; border-radius:6px; cursor:pointer;">
-            🖨️ Imprimir Cupom
-          </button>
-          <button type="button" onclick="enviarCupomWhatsApp()" style="flex:1; background:#25D366; color:#fff; font-weight:700; padding:8px; border:none; border-radius:6px; cursor:pointer;">
-            📲 Enviar no WhatsApp
-          </button>
-        </div>
-      `;
-    }
-
-    function enviarCupomWhatsApp() {
-      if (!ultimaVendaConcluida) {
-        alert('Nenhuma venda concluída para enviar.');
-        return;
-      }
-      const tel = prompt('Digite o WhatsApp do cliente com DDD (Ex: 11988887777):');
-      if (!tel) return;
-      const numLimpo = tel.replace(/\D/g, '');
-      if (numLimpo.length < 10) {
-        alert('Número de WhatsApp inválido.');
-        return;
-      }
-      let texto = `*🧾 COMPROVANTE DE COMPRA - JONAS TECH*\n`;
-      texto += `Venda: #${ultimaVendaConcluida.codigo_venda}\n`;
-      texto += `Data: ${ultimaVendaConcluida.data_hora}\n`;
-      texto += `--------------------------------\n`;
-      ultimaVendaConcluida.itens.forEach(i => {
-        texto += `${i.quantidade}x ${i.nome} - R$ ${i.subtotal.toFixed(2)}\n`;
-      });
-      texto += `--------------------------------\n`;
-      texto += `*TOTAL PAGO: R$ ${ultimaVendaConcluida.total_liquido.toFixed(2)}*\n`;
-      texto += `Forma: ${ultimaVendaConcluida.forma_pagamento}\n\n`;
-      texto += `Obrigado pela preferência! Volte sempre. 😊`;
-      window.open(`https://wa.me/55${numLimpo}?text=${encodeURIComponent(texto)}`, '_blank');
-    }
-
-    function renderizarGradeFastTouch(produtos) {
-      const grid = document.getElementById('gradeFastTouch');
-      if (!grid) return;
-      const lista = (produtos || []).slice(0, 8);
-      if (lista.length === 0) {
-        grid.innerHTML = '<span style="color:#94a3b8; font-size:0.8rem; grid-column: 1/-1;">Carregando produtos do balcão...</span>';
-        return;
-      }
-      grid.innerHTML = lista.map(p => `
-        <button type="button" onclick="adicionarProdutoDireto('${p.sku || p.codigo_barras}', '${(p.nome || '').replace(/'/g, "\\'")}', ${p.preco_venda})" 
-          style="background: #1e293b; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 8px; text-align: left; cursor: pointer; transition: all 0.15s; display: flex; flex-direction: column; justify-content: space-between; min-height: 56px;">
-          <span style="font-size: 0.8rem; font-weight: 700; color: #fff; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${p.nome}</span>
-          <span style="font-family: var(--font-mono); font-size: 0.84rem; font-weight: 800; color: #34d399; margin-top: 4px;">R$ ${Number(p.preco_venda).toFixed(2).replace('.', ',')}</span>
-        </button>
-      `).join('');
-    }
-
-    function adicionarProdutoDireto(cod, nome, preco) {
-      const existente = carrinho.find(item => item.codigo_barras === cod);
-      if (existente) {
-        existente.quantidade += 1;
-      } else {
-        carrinho.push({
-          codigo_barras: cod,
-          nome: nome,
-          preco_unitario: Number(preco),
-          quantidade: 1
-        });
-      }
-      emitirBipLeitor(true);
-      renderizarCarrinho();
-    }
-
-    // CARREGAR ESTOQUE
-    async function carregarEstoque() {
-      try {
-        const busca = document.getElementById('inputBuscaEstoque').value;
-        const res = await fetch(`/api/produtos?busca=${encodeURIComponent(busca)}`);
-        catalogoProdutos = await res.json();
-        
-        const tbody = document.getElementById('estoqueTableBody');
-        tbody.innerHTML = '';
-        renderizarGradeFastTouch(catalogoProdutos);
-        catalogoProdutos.forEach(p => {
-          let statusBadge = '<span class="badge-stock badge-stock-ok">Normal</span>';
-          if (p.estoque_atual <= 0) {
-            statusBadge = '<span class="badge-stock badge-stock-danger">Esgotado</span>';
-          } else if (p.estoque_atual <= p.estoque_minimo) {
-            statusBadge = '<span class="badge-stock badge-stock-warn">Baixo</span>';
-          }
-
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td style="font-family:var(--font-mono); color:var(--text-muted);">${p.codigo_barras}</td>
-            <td><strong>${p.nome}</strong></td>
-            <td><span style="font-size:0.75rem; background:#1e293b; padding:2px 8px; border-radius:4px;">${p.categoria_nome || 'Geral'}</span></td>
-            <td style="font-family:var(--font-mono);">R$ ${p.preco_custo.toFixed(2)}</td>
-            <td style="font-family:var(--font-mono); font-weight:700; color:#34d399;">R$ ${p.preco_venda.toFixed(2)}</td>
-            <td style="font-family:var(--font-mono); font-weight:800;">${p.estoque_atual} ${p.unidade}</td>
-            <td style="font-family:var(--font-mono); color:var(--text-muted);">${p.estoque_minimo}</td>
-            <td>${statusBadge}</td>
-          `;
-          tbody.appendChild(tr);
-        });
-      } catch (e) {
-        console.error(e);
-      }
-    }
-
-    function filtrarEstoque() {
-      carregarEstoque();
-    }
-
-    // CARREGAR STATUS DO CAIXA
-    async function carregarStatusCaixa() {
-      try {
-        const res = await fetch('/api/caixa/status');
-        const s = await res.json();
-        document.getElementById('caixaTotalVendas').innerText = `R$ ${s.total_vendas.toFixed(2)}`;
-        document.getElementById('caixaTotalDinheiro').innerText = `R$ ${s.total_dinheiro.toFixed(2)}`;
-        document.getElementById('caixaSaldoInicial').innerText = `R$ ${s.saldo_inicial.toFixed(2)}`;
-        document.getElementById('caixaTotalPix').innerText = `R$ ${s.total_pix.toFixed(2)}`;
-        const totalCart = s.total_cartao_debito + s.total_cartao_credito;
-        document.getElementById('caixaTotalCartao').innerText = `R$ ${totalCart.toFixed(2)}`;
-      } catch (e) {
-        console.error(e);
-      }
-    }
-
-    async function fecharExpedienteCaixa() {
-      if (!confirm('Deseja realmente encerrar a sessão atual de caixa e fechar o expediente?')) return;
-      try {
-        const res = await fetch('/api/caixa/fechar', {method: 'POST'});
-        const data = await res.json();
-        alert(`Caixa Fechado com Sucesso!\nFaturamento Total: R$ ${data.faturamento_total.toFixed(2)}\nSaldo na Gaveta: R$ ${data.saldo_final_gaveta.toFixed(2)}`);
-        carregarStatusCaixa();
-      } catch (e) {
-        alert('Erro ao fechar caixa.');
-      }
-    }
-
-    // GERADOR PIX AVULSO
-    async function gerarPixAvulso() {
-      const chave = document.getElementById('pixChaveInput').value;
-      const valor = parseFloat(document.getElementById('pixValorInput').value) || 0;
-      const txid = document.getElementById('pixTxidInput').value;
-
-      try {
-        const res = await fetch('/api/pix/gerar', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({ chave, valor, txid })
-        });
-        const data = await res.json();
-        document.getElementById('boxPixAvulsoResultado').style.display = 'block';
-        document.getElementById('imgPixAvulso').src = data.qrcode_url;
-        document.getElementById('textoPixAvulso').innerText = data.payload;
-      } catch (e) {
-        alert('Erro ao gerar PIX.');
-      }
-    }
-
-    function copiarPixAvulso() {
-      const texto = document.getElementById('textoPixAvulso').innerText;
-      navigator.clipboard.writeText(texto);
-      alert('Chave e Payload Copia-e-Cola copiado com sucesso!');
-    }
-
-    // BATERIA DE ESTRESSE AO VIVO
-    async function dispararNovoEstresse() {
-      const btn = document.getElementById('btnRodarEstresse');
-      btn.disabled = true;
-      btn.innerText = '⏳ Executando Bateria de Estresse (Aguarde)...';
-
-      try {
-        const res = await fetch('/api/benchmark/executar', {method: 'POST'});
-        const rel = await res.json();
-        
-        document.getElementById('benchTpsInsercao').innerText = `${rel.etapas.insercao_produtos.taxa_por_segundo.toLocaleString('pt-BR')} /s`;
-        document.getElementById('benchLatencia').innerText = `${rel.etapas.leitura_codigo_barras.latencia_media_ms} ms`;
-        document.getElementById('benchPix').innerText = `${rel.etapas.motor_pix.taxa_por_segundo.toLocaleString('pt-BR')} /s`;
-        document.getElementById('benchVendas').innerText = `${rel.etapas.vendas_concorrentes.transacoes_por_segundo} /s`;
-        
-        alert(`Bateria de Estresse Finalizada com Louvor!\n${rel.etapas.vendas_concorrentes.vendas_sucesso} vendas simultâneas executadas com ZERO FALHAS!\nEstoque 100% íntegro e conciliação perfeita.`);
-      } catch (e) {
-        alert('Erro ao executar bateria de estresse.');
-      } finally {
-        btn.disabled = false;
-        btn.innerText = '▶ Executar Novo Teste de Estresse ao Vivo';
-      }
-    }
-
-    
-    // =========================================================================
-    // MODULOS AVANÇADOS: PONTO DE EQUILÍBRIO, CRM CLIENTES E FROTAS SATELITAIS
-    // =========================================================================
-
-    let listaClientesCache = [];
-
-    async function carregarMetricasFinanceiras() {
-      try {
-        const res = await fetch('/api/financeiro/metricas');
-        const d = await res.json();
-        
-        document.getElementById('finInvestidoEstoque').innerText = `R$ ${d.valor_investido_estoque.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
-        document.getElementById('finTotalItensEstoque').innerText = `${d.total_itens_estoque} itens em estoque no Atlas`;
-        
-        document.getElementById('finVendaEstoque').innerText = `R$ ${d.valor_venda_estoque.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
-        document.getElementById('finLucroProjetado').innerText = `Lucro projetado: R$ ${d.lucro_projetado_estoque.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
-        
-        document.getElementById('finTotalCustosFixos').innerText = `R$ ${d.total_custos_fixos.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
-        document.getElementById('finPontoEquilibrio').innerText = `R$ ${d.ponto_equilibrio_mensal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
-        document.getElementById('finMetaDiaria').innerText = `Meta diária: R$ ${d.meta_diaria_break_even.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
-        
-        document.getElementById('finFaturamentoMes').innerText = `R$ ${d.faturamento_mes.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
-        document.getElementById('finQtdVendasMes').innerText = `${d.qtd_vendas_mes} vendas no mês atual (${d.mes_referencia})`;
-        
-        const elLucro = document.getElementById('finLucroLiquido');
-        const elStatus = document.getElementById('finStatusLucro');
-        elLucro.innerText = `R$ ${d.lucro_liquido_real.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
-        if (d.lucro_liquido_real >= 0) {
-          elLucro.style.color = '#10b981';
-          elStatus.innerText = '🟢 Operação Lucrativa (No Azul)';
-          elStatus.style.color = '#10b981';
-        } else {
-          elLucro.style.color = '#ef4444';
-          elStatus.innerText = `🟠 Faltam R$ ${Math.abs(d.lucro_liquido_real).toLocaleString('pt-BR', {minimumFractionDigits: 2})} para Break-Even`;
-          elStatus.style.color = '#f59e0b';
-        }
-
-        const progresso = Math.min(100, Math.max(0, d.progresso_break_even_pct));
-        document.getElementById('finProgressoTexto').innerText = `${d.progresso_break_even_pct}% atingido`;
-        document.getElementById('finBarraProgresso').style.width = `${progresso}%`;
-        
-        carregarTabelaCustosFixos();
-      } catch (e) {
-        console.error('Erro ao carregar métricas financeiras:', e);
-      }
-    }
-
-    async function carregarTabelaCustosFixos() {
-      try {
-        const res = await fetch('/api/financeiro/custos-fixos');
-        const custos = await res.json();
-        const tbody = document.getElementById('tabelaCustosFixos');
-        if (!custos.length) {
-          tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:16px;">Nenhum custo fixo cadastrado.</td></tr>';
-          return;
-        }
-        tbody.innerHTML = custos.map(c => `
-          <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
-            <td style="padding:8px;"><span style="background:rgba(59,130,246,0.15); color:#60a5fa; padding:3px 8px; border-radius:4px; font-size:0.8rem;">${c.categoria || 'Geral'}</span></td>
-            <td style="padding:8px; font-weight:600;">${c.descricao}</td>
-            <td style="padding:8px; color:var(--text-muted);">Dia ${c.vencimento_dia || 10}</td>
-            <td style="padding:8px; font-weight:700; color:#f59e0b; font-family:var(--font-mono);">R$ ${Number(c.valor_mensal || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
-            <td style="padding:8px; text-align:center;">
-              <button onclick="excluirCustoFixo('${c.descricao}')" style="background:none; border:none; cursor:pointer; color:#ef4444;" title="Excluir Custo">🗑️</button>
-            </td>
-          </tr>
-        `).join('');
-      } catch (e) {
-        console.error(e);
-      }
-    }
-
-    async function salvarCustoFixo() {
-      const desc = document.getElementById('custoDescricao').value.trim();
-      const val = parseFloat(document.getElementById('custoValor').value);
-      const cat = document.getElementById('custoCategoria').value;
-      const dia = parseInt(document.getElementById('custoDia').value) || 10;
-      if (!desc || isNaN(val) || val <= 0) {
-        alert('Informe a descrição e o valor mensal da despesa.');
-        return;
-      }
-      try {
-        await fetch('/api/financeiro/custos-fixos', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({categoria: cat, descricao: desc, valor_mensal: val, vencimento_dia: dia})
-        });
-        document.getElementById('custoDescricao').value = '';
-        document.getElementById('custoValor').value = '';
-        carregarMetricasFinanceiras();
-      } catch (e) {
-        alert('Erro ao gravar custo fixo.');
-      }
-    }
-
-    async function excluirCustoFixo(descricao) {
-      if (!confirm(`Remover despesa "${descricao}"?`)) return;
-      try {
-        await fetch(`/api/financeiro/custos-fixos/${encodeURIComponent(descricao)}`, {method: 'DELETE'});
-        carregarMetricasFinanceiras();
-      } catch (e) {
-        alert('Erro ao excluir custo.');
-      }
-    }
-
-    // --- MÓDULO CLIENTES & CRM ---
-    async function carregarClientes() {
+    async function carregarListaClientesPDV() {
       try {
         const res = await fetch('/api/clientes');
-        listaClientesCache = await res.json();
-        renderizarTabelaClientes(listaClientesCache);
-      } catch (e) {
-        console.error('Erro ao carregar clientes:', e);
-      }
+        const clientes = await res.json();
+        const select = document.getElementById('selectClientePDV');
+        select.innerHTML = '<option value="">Consumidor Balcão (Padrão)</option>';
+        clientes.forEach(c => {
+          const opt = document.createElement('option');
+          opt.value = c.cpf_cnpj;
+          opt.innerText = `${c.nome} (${c.cpf_cnpj})`;
+          opt.dataset.cliente = JSON.stringify(c);
+          select.appendChild(opt);
+        });
+      } catch (e) {}
     }
 
-    function renderizarTabelaClientes(lista) {
-      const tbody = document.getElementById('tabelaClientes');
-      if (!lista.length) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px; color:var(--text-muted);">Nenhum cliente localizado.</td></tr>';
+    function aoSelecionarClientePDV() {
+      const select = document.getElementById('selectClientePDV');
+      const opt = select.options[select.selectedIndex];
+      const boxInfo = document.getElementById('infoClienteFiado');
+
+      if (!opt.value) {
+        clienteSelecionadoPDV = null;
+        boxInfo.style.display = 'none';
+        if (formaPagamento === 'FIADO') selecionarFormaPagamento('PIX');
         return;
       }
-      tbody.innerHTML = lista.map(c => {
-        const numWhats = (c.whatsapp || '').replace(/\D/g, '');
-        const saldoDev = Number(c.saldo_devedor || 0);
-        const linkWhats = numWhats ? `https://wa.me/55${numWhats}?text=${encodeURIComponent(`Olá ${c.nome}, tudo bem? Aqui é o Jonas da Jonas Tech Solutions! Segue extrato da sua conta: Saldo em aberto: R$ ${saldoDev.toFixed(2)}.`)}` : '#';
-        
-        return `
-          <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
-            <td style="padding:10px; font-weight:700;">${c.nome}</td>
-            <td style="padding:10px; font-family:var(--font-mono); color:var(--text-muted);">${c.cpf_cnpj}</td>
-            <td style="padding:10px;">
-              ${numWhats ? `<a href="${linkWhats}" target="_blank" style="color:#22c55e; text-decoration:none; font-weight:600;">📱 ${c.whatsapp}</a>` : '<span style="color:var(--text-muted);">-</span>'}
-            </td>
-            <td style="padding:10px; font-family:var(--font-mono);">R$ ${Number(c.limite_credito || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
-            <td style="padding:10px; font-family:var(--font-mono); font-weight:700; color:${saldoDev > 0 ? '#ef4444' : '#10b981'};">
-              R$ ${saldoDev.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-            </td>
-            <td style="padding:10px;">
-              <span style="background:${c.status === 'ATIVO' ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)'}; color:${c.status === 'ATIVO' ? '#4ade80' : '#f87171'}; padding:3px 8px; border-radius:4px; font-size:0.75rem; font-weight:700;">${c.status || 'ATIVO'}</span>
-            </td>
-            <td style="padding:10px; text-align:center;">
-              <div style="display:flex; justify-content:center; gap:6px;">
-                ${numWhats ? `<a href="${linkWhats}" target="_blank" class="btn-acao" style="background:#22c55e; color:#fff; padding:4px 8px; font-size:0.75rem; text-decoration:none; border-radius:4px;" title="Conversar no WhatsApp">💬 Cobrar/Avisar</a>` : ''}
-                <button onclick="lancarMovimentoFiado('${c.cpf_cnpj}', 'debito')" class="btn-acao btn-secundario" style="padding:4px 8px; font-size:0.75rem;" title="Lançar compra fiado">+ Fiado</button>
-                <button onclick="lancarMovimentoFiado('${c.cpf_cnpj}', 'pagamento')" class="btn-acao btn-sucesso" style="padding:4px 8px; font-size:0.75rem;" title="Receber pagamento">💵 Baixar</button>
-              </div>
-            </td>
-          </tr>
-        `;
-      }).join('');
+
+      clienteSelecionadoPDV = JSON.parse(opt.dataset.cliente || '{}');
+      boxInfo.style.display = 'block';
+      document.getElementById('lblLimiteCliente').innerText = `R$ ${Number(clienteSelecionadoPDV.limite_credito || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
+      document.getElementById('lblSaldoCliente').innerText = `R$ ${Number(clienteSelecionadoPDV.saldo_devedor || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
     }
 
-    function filtrarClientes() {
-      const termo = document.getElementById('buscaClienteInput').value.toLowerCase().trim();
-      if (!termo) {
-        renderizarTabelaClientes(listaClientesCache);
-        return;
+    function enviarCupomWhatsApp(codVenda, total, forma, itensJsonStr) {
+      let fone = '';
+      if (clienteSelecionadoPDV && clienteSelecionadoPDV.whatsapp) {
+        fone = clienteSelecionadoPDV.whatsapp.replace(/\D/g, '');
       }
-      const filtrados = listaClientesCache.filter(c => 
-        (c.nome || '').toLowerCase().includes(termo) ||
-        (c.cpf_cnpj || '').toLowerCase().includes(termo) ||
-        (c.whatsapp || '').includes(termo)
-      );
-      renderizarTabelaClientes(filtrados);
-    }
-
-    async function abrirModalCliente() {
-      const nome = prompt('Nome completo ou Razão Social:');
-      if (!nome) return;
-      const cpfCnpj = prompt('CPF ou CNPJ:');
-      if (!cpfCnpj) return;
-      const whats = prompt('WhatsApp (DDD + Número):') || '';
-      const limite = parseFloat(prompt('Limite de Crédito / Fiado (R$):', '1000')) || 1000;
-      
-      try {
-        await fetch('/api/clientes', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({nome: nome, cpf_cnpj: cpfCnpj, whatsapp: whats, limite_credito: limite, saldo_devedor: 0.0, status: 'ATIVO'})
-        });
-        carregarClientes();
-        alert('Cliente cadastrado com sucesso no MongoDB Atlas!');
-      } catch (e) {
-        alert('Erro ao cadastrar cliente.');
+      if (!fone) {
+        fone = prompt('Informe o WhatsApp do cliente para envio do comprovante (DDD + Número):', '11966707293') || '';
+        fone = fone.replace(/\D/g, '');
       }
-    }
+      if (!fone) return;
 
-    async function lancarMovimentoFiado(cpfCnpj, tipo) {
-      const msg = tipo === 'debito' ? 'Valor da nova compra no FIADO (R$):' : 'Valor recebido para abater da dívida (R$):';
-      const valStr = prompt(msg);
-      if (!valStr) return;
-      const val = parseFloat(valStr);
-      if (isNaN(val) || val <= 0) return alert('Valor inválido.');
+      const itens = JSON.parse(decodeURIComponent(itensJsonStr) || '[]');
+      const resumoItens = itens.map(i => `• ${i.quantidade}x ${i.nome} - R$ ${i.subtotal.toFixed(2)}`).join('%0A');
 
-      try {
-        const res = await fetch('/api/clientes/movimentar-saldo', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({cpf_cnpj: cpfCnpj, tipo: tipo, valor: val})
-        });
-        const d = await res.json();
-        if (d.sucesso) {
-          carregarClientes();
-          alert(`Saldo do cliente atualizado com sucesso! Novo saldo devedor: R$ ${d.cliente.saldo_devedor.toFixed(2)}`);
-        }
-      } catch (e) {
-        alert('Erro ao movimentar saldo do cliente.');
-      }
-    }
+      const texto = `*🧾 COMPROVANTE DE VENDA - JONAS TECH SOLUTIONS*%0A` +
+                    `*Venda:* %23${codVenda}%0A` +
+                    `*Data:* ${new Date().toLocaleDateString('pt-BR')} ${new Date().toLocaleTimeString('pt-BR')}%0A` +
+                    `----------------------------------%0A` +
+                    `*Itens:*%0A${resumoItens}%0A` +
+                    `----------------------------------%0A` +
+                    `*Total Pago:* R$ ${Number(total).toFixed(2)}%0A` +
+                    `*Pagamento:* ${forma}%0A` +
+                    `----------------------------------%0A` +
+                    `Agradecemos a sua preferência!%0A` +
+                    `Jonas Mendonça • WhatsApp: (11) 96670-7293`;
 
-    // --- MÓDULO FROTAS, LOCADORA & SEGUROS ---
-    async function carregarFrotasESeguros() {
-      try {
-        const [resV, resA] = await Promise.all([
-          fetch('/api/frotas/veiculos'),
-          fetch('/api/seguros/apolices')
-        ]);
-        const veiculos = await resV.json();
-        const apolices = await resA.json();
-
-        // Atualiza KPIs
-        document.getElementById('frotaTotalQtd').innerText = veiculos.length;
-        document.getElementById('frotaAlugadosQtd').innerText = veiculos.filter(v => v.status === 'ALUGADO').length;
-        document.getElementById('frotaDisponiveisQtd').innerText = veiculos.filter(v => v.status === 'DISPONIVEL').length;
-        document.getElementById('frotaApolicesQtd').innerText = apolices.length;
-
-        // Renderiza tabela veiculos
-        const tbodyV = document.getElementById('tabelaVeiculos');
-        tbodyV.innerHTML = veiculos.map(v => `
-          <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
-            <td style="padding:10px; font-family:var(--font-mono); font-weight:800; font-size:1rem; color:#38bdf8;">${v.placa}</td>
-            <td style="padding:10px; font-weight:600;">${v.modelo} <br><small style="color:var(--text-muted);">${v.categoria || 'Passeio'} (${v.ano || 2024})</small></td>
-            <td style="padding:10px; font-family:var(--font-mono);">${Number(v.km || 0).toLocaleString('pt-BR')} km</td>
-            <td style="padding:10px; font-family:var(--font-mono); color:#10b981; font-weight:700;">R$ ${Number(v.diaria_valor || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}/dia</td>
-            <td style="padding:10px;">
-              <span style="background:${v.status === 'DISPONIVEL' ? 'rgba(34,197,94,0.15)' : 'rgba(245,158,11,0.15)'}; color:${v.status === 'DISPONIVEL' ? '#4ade80' : '#fbbf24'}; padding:3px 8px; border-radius:4px; font-size:0.75rem; font-weight:700;">
-                ${v.status}
-              </span>
-            </td>
-            <td style="padding:10px;">
-              ${v.ignicao ? '<span style="color:#22c55e; font-weight:700;">🟢 Ligada</span>' : '<span style="color:var(--text-muted);">🔴 Desligada</span>'}
-            </td>
-            <td style="padding:10px; font-size:0.8rem; color:var(--text-muted);">
-              📍 ${v.gps?.endereco || 'São Paulo - SP'}<br>
-              <small style="color:#60a5fa; font-family:var(--font-mono);">ID: ${v.rastreador_id || 'SAT-0000'}</small>
-            </td>
-            <td style="padding:10px; text-align:center;">
-              <button onclick="acionarBloqueioSatelite('${v.placa}')" class="btn-acao" style="background:${v.bloqueado ? '#22c55e' : '#ef4444'}; color:#fff; padding:6px 12px; font-size:0.8rem; font-weight:700; border-radius:6px; cursor:pointer;">
-                ${v.bloqueado ? '🔓 Desbloquear Veículo' : '🚨 Cortar Ignição (Bloquear)'}
-              </button>
-            </td>
-          </tr>
-        `).join('');
-
-        // Renderiza tabela apolices
-        const tbodyA = document.getElementById('tabelaApolices');
-        tbodyA.innerHTML = apolices.map(a => `
-          <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
-            <td style="padding:10px; font-family:var(--font-mono); font-weight:700; color:#a855f7;">${a.numero_apolice}</td>
-            <td style="padding:10px; font-weight:700; color:#38bdf8;">${a.veiculo_placa}</td>
-            <td style="padding:10px; font-weight:600;">${a.cliente_nome}</td>
-            <td style="padding:10px;"><span style="background:rgba(168,85,247,0.15); color:#c084fc; padding:3px 8px; border-radius:4px; font-size:0.75rem;">${a.tipo}</span></td>
-            <td style="padding:10px; font-family:var(--font-mono);">R$ ${Number(a.franquia || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
-            <td style="padding:10px; font-family:var(--font-mono); font-weight:700; color:#10b981;">R$ ${Number(a.valor_mensal || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}/mês</td>
-            <td style="padding:10px; color:var(--text-muted);">${a.vigencia_fim || '31/12/2026'}</td>
-            <td style="padding:10px;"><span style="background:rgba(34,197,94,0.15); color:#4ade80; padding:3px 8px; border-radius:4px; font-size:0.75rem; font-weight:700;">${a.status}</span></td>
-          </tr>
-        `).join('');
-
-      } catch (e) {
-        console.error('Erro ao carregar frotas e seguros:', e);
-      }
-    }
-
-    async function acionarBloqueioSatelite(placa) {
-      if (!confirm(`Confirma o envio do sinal de satélite para alterar o status do veículo ${placa}?`)) return;
-      try {
-        const res = await fetch('/api/frotas/bloqueio', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({placa: placa})
-        });
-        const d = await res.json();
-        if (d.sucesso) {
-          alert(`📡 TELEMETRIA CONFIRMADA VIA SATÉLITE:
-${d.mensagem}`);
-          carregarFrotasESeguros();
-        } else {
-          alert('Erro no comando de satélite: ' + (d.erro || 'Falha na transmissão'));
-        }
-      } catch (e) {
-        alert('Erro ao transmitir comando de bloqueio.');
-      }
-    }
-
-    async function abrirModalVeiculo() {
-      const placa = prompt('Placa do veículo (padrão Mercosul):');
-      if (!placa) return;
-      const modelo = prompt('Modelo do veículo (ex: Fiat Strada 1.3):') || 'Veículo';
-      const diaria = parseFloat(prompt('Valor da diária (R$):', '150')) || 150;
-      const km = parseFloat(prompt('Km atual:', '20000')) || 20000;
-      
-      try {
-        await fetch('/api/frotas/veiculos', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({placa: placa, modelo: modelo, diaria_valor: diaria, km: km, status: 'DISPONIVEL', ignicao: false, bloqueado: false})
-        });
-        carregarFrotasESeguros();
-        alert(`Veículo ${placa} cadastrado com sucesso na frota!`);
-      } catch (e) {
-        alert('Erro ao cadastrar veículo.');
-      }
+      window.open(`https://wa.me/55${fone}?text=${texto}`, '_blank');
     }
 
 
@@ -1898,8 +1550,88 @@ ${d.mensagem}`);
     window.onload = () => {
       renderizarCarrinho();
       carregarEstoque();
+      carregarListaClientesPDV();
       setTimeout(() => document.getElementById('inputCodigo').focus(), 200);
     };
   </script>
+
+  <!-- MODAL 1: CÂMERA SCANNER EM TEMPO REAL -->
+  <div id="modalCameraScanner" class="modal-overlay">
+    <div class="modal-box" style="text-align:center;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <h3 style="font-size:1.1rem; font-weight:700; color:#38bdf8;">📸 Leitor de Código via Câmera</h3>
+        <button onclick="fecharCameraScanner()" style="background:none; border:none; color:#ef4444; font-size:1.4rem; cursor:pointer;">✖</button>
+      </div>
+      <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:12px;">
+        Aponte o código de barras ou QR Code do produto para a mira da câmera.
+      </p>
+      <div style="position:relative; width:100%; height:260px; background:#000; border-radius:10px; overflow:hidden; border:2px solid #0284c7;">
+        <video id="videoLeitorCamera" autoplay playsinline style="width:100%; height:100%; object-fit:cover;"></video>
+        <div style="position:absolute; top:50%; left:10%; right:10%; height:2px; background:#ef4444; box-shadow:0 0 8px #ef4444; transform:translateY(-50%);"></div>
+        <div style="position:absolute; top:25%; bottom:25%; left:15%; right:15%; border:2px dashed rgba(255,255,255,0.4); border-radius:8px; pointer-events:none;"></div>
+      </div>
+      <div style="margin-top:12px; display:flex; justify-content:center; gap:10px;">
+        <button onclick="capturarFrameManualCamera()" class="btn btn-primario" style="font-size:0.85rem; padding:8px 16px;">
+          ⚡ Bipar Código Agora
+        </button>
+        <button onclick="fecharCameraScanner()" class="btn btn-secondary" style="font-size:0.85rem; padding:8px 16px;">
+          Fechar Câmera
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 2: CADASTRO RÁPIDO DE PRODUTO (5 SEGUNDOS) -->
+  <div id="modalProdutoRapido" class="modal-overlay">
+    <div class="modal-box">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <h3 style="font-size:1.1rem; font-weight:700; color:#10b981;">➕ Cadastrar Produto em 5 Segundos</h3>
+        <button onclick="fecharModalProdutoRapido()" style="background:none; border:none; color:#ef4444; font-size:1.4rem; cursor:pointer;">✖</button>
+      </div>
+      <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:12px;">
+        Cadastre um item novo e passe na venda imediatamente sem sair do balcão!
+      </p>
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <div>
+          <label style="font-size:0.75rem; color:var(--text-muted);">Código de Barras / SKU:</label>
+          <input type="text" id="cadProdCodigo" class="input-form" style="width:100%;" placeholder="789...">
+        </div>
+        <div>
+          <label style="font-size:0.75rem; color:var(--text-muted);">Nome do Produto:</label>
+          <input type="text" id="cadProdNome" class="input-form" style="width:100%;" placeholder="Ex: Cabo USB Tipo-C Turbo 1m">
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+          <div>
+            <label style="font-size:0.75rem; color:var(--text-muted);">Preço de Venda (R$):</label>
+            <input type="number" step="0.50" id="cadProdPrecoVenda" class="input-form" style="width:100%; font-weight:700;" placeholder="25.00">
+          </div>
+          <div>
+            <label style="font-size:0.75rem; color:var(--text-muted);">Preço de Custo (R$):</label>
+            <input type="number" step="0.50" id="cadProdPrecoCusto" class="input-form" style="width:100%;" placeholder="12.00">
+          </div>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+          <div>
+            <label style="font-size:0.75rem; color:var(--text-muted);">Estoque Inicial:</label>
+            <input type="number" id="cadProdEstoque" class="input-form" style="width:100%;" value="10">
+          </div>
+          <div>
+            <label style="font-size:0.75rem; color:var(--text-muted);">Categoria:</label>
+            <select id="cadProdCategoria" class="input-form" style="width:100%;">
+              <option value="Acessórios">Acessórios</option>
+              <option value="Eletrônicos">Eletrônicos</option>
+              <option value="Hardware">Hardware</option>
+              <option value="Serviços">Serviços & TV</option>
+              <option value="Geral">Geral</option>
+            </select>
+          </div>
+        </div>
+        <button onclick="salvarProdutoRapidoEBipar()" class="btn btn-primario" style="margin-top:10px; padding:12px; font-weight:700; font-size:0.95rem;">
+          💾 Salvar e Adicionar à Venda
+        </button>
+      </div>
+    </div>
+  </div>
+
 </body>
 </html>

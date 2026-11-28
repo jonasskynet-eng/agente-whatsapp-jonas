@@ -1116,23 +1116,27 @@ def api_pdv_cadastrar_produto():
 
 @app.route("/api/venda", methods=["POST"])
 def api_pdv_registrar_venda():
-    """Registra venda no Atlas, dá baixa no estoque e gera cupom."""
+    """Registra venda no Atlas, dá baixa no estoque, aplica desconto e gerencia fiado."""
     try:
         dados = request.json or {}
         itens = dados.get("itens") or []
         if not itens:
             return jsonify({"erro": "O carrinho está vazio"}), 400
 
-        forma_pgto = dados.get("forma_pagamento", "DINHEIRO")
-        total_liquido = 0.0
+        forma_pgto = dados.get("forma_pagamento", "DINHEIRO").upper()
+        cliente_nome = (dados.get("cliente_nome") or "Consumidor Balcão").strip()
+        cliente_cpf = (dados.get("cliente_cpf") or "").strip()
+        desconto_valor = float(dados.get("desconto_valor", 0.0))
+
+        subtotal_bruto = 0.0
         itens_formatados = []
 
         for item in itens:
-            cod = str(item.get("codigo_barras") or item.get("sku"))
+            cod = str(item.get("codigo_barras") or item.get("sku", ""))
             qtd = float(item.get("quantidade", 1))
             preco_un = float(item.get("preco_unitario", 0))
             subtotal = round(qtd * preco_un, 2)
-            total_liquido += subtotal
+            subtotal_bruto += subtotal
 
             itens_formatados.append({
                 "codigo_barras": cod,
@@ -1149,21 +1153,32 @@ def api_pdv_registrar_venda():
                     {"$inc": {"quantidade_estoque": -qtd}}
                 )
 
+        total_liquido = max(0.0, round(subtotal_bruto - desconto_valor, 2))
         cod_venda = f"VD-{int(time.time())}"
         data_hora = agora_brasilia().strftime("%d/%m/%Y %H:%M:%S")
         valor_pago = float(dados.get("valor_pago") or total_liquido)
-        troco = max(0.0, valor_pago - total_liquido) if forma_pgto == "DINHEIRO" else 0.0
+        troco = max(0.0, round(valor_pago - total_liquido, 2)) if forma_pgto == "DINHEIRO" else 0.0
+
+        # Se a venda for no FIADO / A PRAZO, lança débito automático na conta do cliente
+        if forma_pgto in ["FIADO", "A_PRAZO", "PRAZO"] and col_clientes is not None and cliente_cpf:
+            col_clientes.update_one(
+                {"cpf_cnpj": cliente_cpf},
+                {"$inc": {"saldo_devedor": total_liquido}}
+            )
 
         doc_venda = {
             "codigo_venda": cod_venda,
             "data_hora": data_hora,
-            "total_bruto": round(total_liquido, 2),
-            "total_liquido": round(total_liquido, 2),
+            "cliente_nome": cliente_nome,
+            "cliente_cpf": cliente_cpf,
+            "subtotal_bruto": round(subtotal_bruto, 2),
+            "desconto_valor": round(desconto_valor, 2),
+            "total_liquido": total_liquido,
             "forma_pagamento": forma_pgto,
-            "valor_pago": round(valor_pago, 2),
-            "troco": round(troco, 2),
+            "valor_pago": valor_pago,
+            "troco": troco,
             "itens": itens_formatados,
-            "origem": "PDV_NUVEM_WEB"
+            "status": "CONCLUIDA"
         }
 
         if col_vendas is not None:
@@ -1171,7 +1186,7 @@ def api_pdv_registrar_venda():
 
         # Registra automaticamente no relatório de e-mail diário do Jonas
         registrar_evento_email(
-            "VENDA_PDV", "Cliente Balcão", "(Balcão)", total_liquido,
+            "VENDA_PDV", cliente_nome, f"({cliente_cpf or 'Balcão'})", total_liquido,
             f"Venda #{cod_venda} ({len(itens)} itens)",
             f"Pagamento em {forma_pgto} no PDV Nuvem"
         )
