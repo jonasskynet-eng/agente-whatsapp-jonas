@@ -631,9 +631,113 @@
       border: 1px solid var(--card-border);
       border-radius: 14px;
       padding: 1.5rem;
-      max-width: 480px;
-      width: 90%;
+      max-width: 520px;
+      width: 92%;
+      max-height: 90vh;
+      overflow-y: auto;
       box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+    }
+
+    /* CONTROLES PADRONIZADOS PARA ABAS 3, 4 E 5 */
+    .input-form {
+      background: #070a13;
+      border: 1px solid #334155;
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 0.9rem;
+      padding: 9px 12px;
+      border-radius: 8px;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .input-form:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+    }
+    .btn-acao {
+      border: 1px solid transparent;
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-family: var(--font);
+      font-weight: 700;
+      font-size: 0.85rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: background-color 0.2s, border-color 0.2s, transform 0.15s;
+      color: #f8fafc;
+      background: #1e293b;
+    }
+    .btn-acao:hover {
+      transform: translateY(-1px);
+    }
+    .btn-primario {
+      background: #3b82f6;
+      border-color: #60a5fa;
+      color: #ffffff;
+    }
+    .btn-primario:hover {
+      background: #2563eb;
+    }
+    .btn-sucesso {
+      background: #10b981;
+      border-color: #34d399;
+      color: #052e16;
+    }
+    .btn-sucesso:hover {
+      background: #059669;
+      color: #ffffff;
+    }
+    .btn-secundario {
+      background: #1e293b;
+      border-color: #334155;
+      color: #e2e8f0;
+    }
+    .btn-secundario:hover {
+      background: #334155;
+    }
+    .btn-alerta {
+      background: rgba(245, 158, 11, 0.18);
+      border-color: #f59e0b;
+      color: #fbbf24;
+    }
+    .btn-alerta:hover {
+      background: #f59e0b;
+      color: #000000;
+    }
+    .btn-perigo {
+      background: rgba(239, 68, 68, 0.18);
+      border-color: #ef4444;
+      color: #f87171;
+    }
+    .btn-perigo:hover {
+      background: #ef4444;
+      color: #ffffff;
+    }
+    .frota-pin-card {
+      max-width: 460px;
+      margin: 2.5rem auto;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 2rem;
+      text-align: center;
+      box-shadow: 0 20px 45px rgba(0, 0, 0, 0.5);
+    }
+    .mapa-link {
+      color: #38bdf8;
+      text-decoration: none;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.78rem;
+      margin-top: 3px;
+    }
+    .mapa-link:hover {
+      text-decoration: underline;
     }
 
   </style>
@@ -1091,87 +1195,146 @@
 
     <!-- ABA 5: FROTAS, LOCADORA & SEGUROS VEICULARES -->
     <section id="pane-frotas" class="tab-pane">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:12px;">
-        <div>
-          <h2 style="font-size:1.4rem; font-weight:700;">🚗 Frotas de Veículos, Locadora & Monitoramento Satelital</h2>
-          <p style="color:var(--text-muted); font-size:0.9rem;">Telemetria veicular, corte de ignição via satélite e controle de apólices de locação e seguro.</p>
+
+      <!-- TELA DE BLOQUEIO POR PIN DO OPERADOR -->
+      <div id="frotaLockBox" class="frota-pin-card">
+        <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🔐</div>
+        <h2 style="font-size: 1.35rem; font-weight: 800; margin-bottom: 0.4rem;">Acesso Restrito: Frotas & Satélite</h2>
+        <p style="color: var(--text-muted); font-size: 0.88rem; line-height: 1.5; margin-bottom: 1rem;">
+          Para proteger dados de localização, contratos de clientes e comandos de bloqueio veicular, informe o PIN do operador.
+        </p>
+        <div id="avisoPinPadraoFrota" style="display: none; background: rgba(245, 158, 11, 0.14); border: 1px solid rgba(245, 158, 11, 0.45); color: #fbbf24; border-radius: 8px; padding: 10px; font-size: 0.82rem; margin-bottom: 1rem; text-align: left;">
+          ⚠️ <strong>PIN inicial ainda ativo:</strong> após entrar, recomendamos clicar em <strong>🔑 Alterar PIN</strong> para definir uma senha pessoal.
         </div>
-        <div style="display:flex; gap:10px;">
-          <button onclick="carregarFrotasESeguros()" class="btn-acao btn-sucesso" style="padding:10px 18px; font-weight:600; font-size:0.9rem;">
-            🔄 Sincronizar Satélite
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <input type="password" id="inputPinFrota" class="input-form" style="text-align: center; font-size: 1.2rem; letter-spacing: 4px; font-family: var(--font-mono);" placeholder="••••" onkeydown="if(event.key==='Enter') autenticarFrotas()">
+          <div id="erroPinFrota" style="display: none; color: #f87171; font-size: 0.82rem; font-weight: 600;"></div>
+          <button onclick="autenticarFrotas()" class="btn-acao btn-sucesso" style="padding: 12px; font-size: 0.95rem;">
+            🔓 Desbloquear Módulo de Frotas
           </button>
-          <button onclick="abrirModalVeiculo()" class="btn-acao btn-primario" style="padding:10px 18px; font-weight:600; font-size:0.9rem;">
-            ➕ Cadastrar Veículo
-          </button>
         </div>
       </div>
 
-      <!-- KPI CARDS FROTAS -->
-      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:1rem; margin-bottom:1.5rem;">
-        <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:12px; padding:1.2rem;">
-          <span style="font-size:0.8rem; color:var(--text-muted); text-transform:uppercase;">🚗 Veículos na Frota</span>
-          <div id="frotaTotalQtd" style="font-size:1.8rem; font-weight:800; color:#38bdf8; font-family:var(--font-mono); margin-top:4px;">0</div>
-          <span style="font-size:0.75rem; color:var(--text-muted);">Com rastreador ativo</span>
+      <!-- CONTEÚDO LIBERADO APÓS AUTENTICAÇÃO -->
+      <div id="frotaConteudoBox" style="display: none;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem; flex-wrap:wrap; gap:12px;">
+          <div>
+            <h2 style="font-size:1.4rem; font-weight:700;">🚗 Frotas de Veículos, Locadora & Seguros</h2>
+            <p style="color:var(--text-muted); font-size:0.88rem;">Locação integrada ao caixa do PDV, apólices de seguro e comandos simulados com registro em nuvem.</p>
+          </div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button onclick="carregarFrotasESeguros()" class="btn-acao btn-secundario">
+              🔄 Atualizar
+            </button>
+            <button onclick="abrirModalVeiculo()" class="btn-acao btn-primario">
+              ➕ Cadastrar Veículo
+            </button>
+            <button onclick="abrirModalApolice()" class="btn-acao btn-sucesso">
+              🛡️ Nova Apólice
+            </button>
+            <button onclick="abrirModalAlterarPin()" class="btn-acao btn-alerta">
+              🔑 Alterar PIN
+            </button>
+            <button onclick="bloquearPainelFrotas()" class="btn-acao btn-perigo" title="Trancar aba ao sair do balcão">
+              🔒 Trancar
+            </button>
+          </div>
         </div>
-        <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:12px; padding:1.2rem;">
-          <span style="font-size:0.8rem; color:var(--text-muted); text-transform:uppercase;">🛣️ Em Locação / Trânsito</span>
-          <div id="frotaAlugadosQtd" style="font-size:1.8rem; font-weight:800; color:#f59e0b; font-family:var(--font-mono); margin-top:4px;">0</div>
-          <span style="font-size:0.75rem; color:#f59e0b;">Gerando diárias</span>
-        </div>
-        <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:12px; padding:1.2rem;">
-          <span style="font-size:0.8rem; color:var(--text-muted); text-transform:uppercase;">🅿️ No Pátio (Disponíveis)</span>
-          <div id="frotaDisponiveisQtd" style="font-size:1.8rem; font-weight:800; color:#10b981; font-family:var(--font-mono); margin-top:4px;">0</div>
-          <span style="font-size:0.75rem; color:#10b981;">Prontos para saída</span>
-        </div>
-        <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:12px; padding:1.2rem;">
-          <span style="font-size:0.8rem; color:var(--text-muted); text-transform:uppercase;">🛡️ Apólices / Seguros</span>
-          <div id="frotaApolicesQtd" style="font-size:1.8rem; font-weight:800; color:#a855f7; font-family:var(--font-mono); margin-top:4px;">0</div>
-          <span style="font-size:0.75rem; color:#a855f7;">Contratos vigentes</span>
-        </div>
-      </div>
 
-      <!-- TABELA DE VEICULOS COM TELEMETRIA & BLOQUEIO SATELITAL -->
-      <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:12px; padding:1.2rem; margin-bottom:1.5rem; overflow-x:auto;">
-        <h3 style="font-size:1.1rem; margin-bottom:1rem; font-weight:700;">📡 Telemetria & Controle Remoto da Frota</h3>
-        <table style="width:100%; border-collapse:collapse; text-align:left; font-size:0.9rem;">
-          <thead>
-            <tr style="border-bottom:1px solid var(--card-border); color:var(--text-muted);">
-              <th style="padding:10px;">Placa</th>
-              <th style="padding:10px;">Modelo / Categoria</th>
-              <th style="padding:10px;">Odômetro</th>
-              <th style="padding:10px;">Diária</th>
-              <th style="padding:10px;">Status</th>
-              <th style="padding:10px;">Ignição</th>
-              <th style="padding:10px;">Localização GPS</th>
-              <th style="padding:10px; text-align:center;">Comando Satélite</th>
-            </tr>
-          </thead>
-          <tbody id="tabelaVeiculos">
-            <tr><td colspan="8" style="text-align:center; padding:20px; color:var(--text-muted);">Carregando telemetria de satélite...</td></tr>
-          </tbody>
-        </table>
-      </div>
+        <!-- AVISO HONESTO DE TELEMETRIA SIMULADA -->
+        <div style="background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.3); color: #bae6fd; border-radius: 10px; padding: 10px 14px; font-size: 0.82rem; margin-bottom: 1.25rem;">
+          📡 <strong>Modo Simulado Ativo:</strong> Os comandos de bloqueio e a localização GPS são gravados no MongoDB Atlas para gestão e demonstração. Para cortar ignição real na rua, conecte um rastreador físico (ex.: Traccar/Suntech) à rota de bloqueio.
+        </div>
 
-      <!-- TABELA DE APÓLICES E SEGUROS -->
-      <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:12px; padding:1.2rem; overflow-x:auto;">
-        <h3 style="font-size:1.1rem; margin-bottom:1rem; font-weight:700;">📑 Apólices de Seguros & Contratos de Locação</h3>
-        <table style="width:100%; border-collapse:collapse; text-align:left; font-size:0.9rem;">
-          <thead>
-            <tr style="border-bottom:1px solid var(--card-border); color:var(--text-muted);">
-              <th style="padding:10px;">Nº Apólice / Contrato</th>
-              <th style="padding:10px;">Veículo Placa</th>
-              <th style="padding:10px;">Cliente Vinculado</th>
-              <th style="padding:10px;">Tipo de Cobertura</th>
-              <th style="padding:10px;">Franquia</th>
-              <th style="padding:10px;">Valor Mensal</th>
-              <th style="padding:10px;">Vigência Até</th>
-              <th style="padding:10px;">Status</th>
-            </tr>
-          </thead>
-          <tbody id="tabelaApolices">
-            <tr><td colspan="8" style="text-align:center; padding:20px; color:var(--text-muted);">Carregando apólices de seguro...</td></tr>
-          </tbody>
-        </table>
+        <!-- 5 KPI CARDS FROTAS -->
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:1rem; margin-bottom:1.5rem;">
+          <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:12px; padding:1.1rem;">
+            <span style="font-size:0.78rem; color:var(--text-muted); text-transform:uppercase;">🚗 Total na Frota</span>
+            <div id="frotaTotalQtd" style="font-size:1.75rem; font-weight:800; color:#38bdf8; font-family:var(--font-mono); margin-top:4px;">0</div>
+            <span style="font-size:0.75rem; color:var(--text-muted);">Veículos cadastrados</span>
+          </div>
+          <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:12px; padding:1.1rem;">
+            <span style="font-size:0.78rem; color:var(--text-muted); text-transform:uppercase;">🛣️ Em Locação</span>
+            <div id="frotaAlugadosQtd" style="font-size:1.75rem; font-weight:800; color:#f59e0b; font-family:var(--font-mono); margin-top:4px;">0</div>
+            <span style="font-size:0.75rem; color:#f59e0b;">Contratos ativos</span>
+          </div>
+          <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:12px; padding:1.1rem;">
+            <span style="font-size:0.78rem; color:var(--text-muted); text-transform:uppercase;">🅿️ Disponíveis</span>
+            <div id="frotaDisponiveisQtd" style="font-size:1.75rem; font-weight:800; color:#10b981; font-family:var(--font-mono); margin-top:4px;">0</div>
+            <span style="font-size:0.75rem; color:#10b981;">Prontos para alugar</span>
+          </div>
+          <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:12px; padding:1.1rem;">
+            <span style="font-size:0.78rem; color:var(--text-muted); text-transform:uppercase;">🔧 Manutenção / Travados</span>
+            <div id="frotaIndisponiveisQtd" style="font-size:1.75rem; font-weight:800; color:#f87171; font-family:var(--font-mono); margin-top:4px;">0</div>
+            <span id="frotaIndisponiveisDetalhe" style="font-size:0.75rem; color:#f87171;">0 oficina • 0 bloqueados</span>
+          </div>
+          <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:12px; padding:1.1rem;">
+            <span style="font-size:0.78rem; color:var(--text-muted); text-transform:uppercase;">🛡️ Apólices & Seguros</span>
+            <div id="frotaApolicesQtd" style="font-size:1.75rem; font-weight:800; color:#a855f7; font-family:var(--font-mono); margin-top:4px;">0</div>
+            <span id="frotaApolicesAlerta" style="font-size:0.75rem; color:#c084fc;">Contratos vigentes</span>
+          </div>
+        </div>
+
+        <!-- BARRA DE BUSCA E FILTRO -->
+        <div style="display:flex; gap:10px; margin-bottom:1rem; flex-wrap:wrap; align-items:center;">
+          <input type="text" id="buscaFrotaInput" oninput="filtrarFrotas()" placeholder="🔍 Buscar por placa, modelo ou cliente..." class="input-form" style="flex:1; min-width:240px;">
+          <select id="filtroStatusFrota" onchange="filtrarFrotas()" class="input-form" style="min-width:190px;">
+            <option value="TODOS">Todos os Status</option>
+            <option value="DISPONIVEL">Disponíveis</option>
+            <option value="ALUGADO">Alugados</option>
+            <option value="MANUTENCAO">Em Manutenção</option>
+            <option value="BLOQUEADO">Bloqueados via Satélite</option>
+          </select>
+        </div>
+
+        <!-- TABELA DE VEICULOS COM LOCAÇÃO, MAPA & CONTROLE REMOTO -->
+        <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:12px; padding:1.2rem; margin-bottom:1.5rem; overflow-x:auto;">
+          <h3 style="font-size:1.08rem; margin-bottom:1rem; font-weight:700;">📡 Frota, Telemetria & Operação de Locadora</h3>
+          <table style="width:100%; border-collapse:collapse; text-align:left; font-size:0.88rem;">
+            <thead>
+              <tr style="border-bottom:1px solid var(--card-border); color:var(--text-muted);">
+                <th style="padding:10px;">Placa</th>
+                <th style="padding:10px;">Veículo / Categoria</th>
+                <th style="padding:10px;">Odômetro / Diária</th>
+                <th style="padding:10px;">Status & Locatário</th>
+                <th style="padding:10px;">Ignição & Trava</th>
+                <th style="padding:10px;">GPS & Último Comando</th>
+                <th style="padding:10px; text-align:center;">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="tabelaVeiculos">
+              <tr><td colspan="7" style="text-align:center; padding:20px; color:var(--text-muted);">Carregando telemetria...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- TABELA DE APÓLICES E SEGUROS -->
+        <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:12px; padding:1.2rem; overflow-x:auto;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:8px;">
+            <h3 style="font-size:1.08rem; font-weight:700;">📑 Apólices de Seguros & Contratos</h3>
+            <button onclick="abrirModalApolice()" class="btn-acao btn-sucesso" style="padding:6px 12px; font-size:0.8rem;">
+              ➕ Nova Apólice / Contrato
+            </button>
+          </div>
+          <table style="width:100%; border-collapse:collapse; text-align:left; font-size:0.88rem;">
+            <thead>
+              <tr style="border-bottom:1px solid var(--card-border); color:var(--text-muted);">
+                <th style="padding:10px;">Nº Apólice</th>
+                <th style="padding:10px;">Placa</th>
+                <th style="padding:10px;">Cliente / Seguradora</th>
+                <th style="padding:10px;">Cobertura</th>
+                <th style="padding:10px;">Franquia</th>
+                <th style="padding:10px;">Mensalidade</th>
+                <th style="padding:10px;">Vigência</th>
+                <th style="padding:10px;">Status</th>
+                <th style="padding:10px; text-align:center;">Ação</th>
+              </tr>
+            </thead>
+            <tbody id="tabelaApolices">
+              <tr><td colspan="9" style="text-align:center; padding:20px; color:var(--text-muted);">Carregando apólices...</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </section>
 
@@ -1619,7 +1782,7 @@
       if (abaId === 'fechamento') carregarStatusCaixa();
       if (abaId === 'equilibrio') carregarMetricasFinanceiras();
       if (abaId === 'clientes') carregarClientes();
-      if (abaId === 'frotas') carregarFrotasESeguros();
+      if (abaId === 'frotas') verificarAcessoFrotas();
       if (abaId === 'pdv') {
         setTimeout(() => document.getElementById('inputCodigo').focus(), 100);
       }
@@ -2265,108 +2428,725 @@
       }
     }
 
-    // --- MÓDULO FROTAS, LOCADORA & SEGUROS ---
-    async function carregarFrotasESeguros() {
+    // --- MÓDULO FROTAS, LOCADORA & SEGUROS (BLINDADO + INTEGRADO AO PDV) ---
+    let frotaVeiculosCache = [];
+    let frotaApolicesCache = [];
+    let frotaClientesCache = [];
+
+    function escaparHtml(texto) {
+      return String(texto ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function obterTokenFrota() {
+      return sessionStorage.getItem('frotaToken') || '';
+    }
+
+    function headersFrota(comJson = false) {
+      const h = { 'X-Frota-Token': obterTokenFrota() };
+      if (comJson) h['Content-Type'] = 'application/json';
+      return h;
+    }
+
+    async function frotasFetch(url, opcoes = {}) {
+      const headers = Object.assign({}, headersFrota(Boolean(opcoes.body)), opcoes.headers || {});
+      const res = await fetch(url, Object.assign({}, opcoes, { headers }));
+      if (res.status === 401) {
+        sessionStorage.removeItem('frotaToken');
+        mostrarTelaBloqueioFrota(true);
+      }
+      return res;
+    }
+
+    function mostrarTelaBloqueioFrota(mostrarAvisoPin = false) {
+      const lockBox = document.getElementById('frotaLockBox');
+      const contentBox = document.getElementById('frotaConteudoBox');
+      if (lockBox) lockBox.style.display = 'block';
+      if (contentBox) contentBox.style.display = 'none';
+      if (mostrarAvisoPin) {
+        const errEl = document.getElementById('erroPinFrota');
+        if (errEl) {
+          errEl.innerText = 'Sessão expirada ou bloqueada. Digite o PIN do operador.';
+          errEl.style.display = 'block';
+        }
+      }
+      setTimeout(() => {
+        const inp = document.getElementById('inputPinFrota');
+        if (inp) inp.focus();
+      }, 100);
+    }
+
+    async function verificarAcessoFrotas() {
       try {
-        const [resV, resA] = await Promise.all([
-          fetch('/api/frotas/veiculos'),
-          fetch('/api/seguros/apolices')
+        const res = await fetch('/api/frotas/status-pin', { headers: headersFrota() });
+        const st = await res.json();
+        const avisoPadrao = document.getElementById('avisoPinPadraoFrota');
+        if (avisoPadrao) avisoPadrao.style.display = st.pin_padrao ? 'block' : 'none';
+
+        if (st.autenticado && obterTokenFrota()) {
+          document.getElementById('frotaLockBox').style.display = 'none';
+          document.getElementById('frotaConteudoBox').style.display = 'block';
+          await carregarFrotasESeguros();
+        } else {
+          sessionStorage.removeItem('frotaToken');
+          mostrarTelaBloqueioFrota(false);
+        }
+      } catch (e) {
+        mostrarTelaBloqueioFrota(false);
+      }
+    }
+
+    async function autenticarFrotas() {
+      const pinInput = document.getElementById('inputPinFrota');
+      const errEl = document.getElementById('erroPinFrota');
+      const pin = (pinInput?.value || '').trim();
+      if (!pin) {
+        errEl.innerText = 'Informe o PIN para continuar.';
+        errEl.style.display = 'block';
+        return;
+      }
+      try {
+        const res = await fetch('/api/frotas/autenticar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pin })
+        });
+        const d = await res.json();
+        if (!res.ok || !d.token) {
+          errEl.innerText = d.erro || 'PIN inválido.';
+          errEl.style.display = 'block';
+          pinInput.value = '';
+          pinInput.focus();
+          return;
+        }
+        errEl.style.display = 'none';
+        pinInput.value = '';
+        sessionStorage.setItem('frotaToken', d.token);
+        document.getElementById('frotaLockBox').style.display = 'none';
+        document.getElementById('frotaConteudoBox').style.display = 'block';
+        await carregarFrotasESeguros();
+      } catch (e) {
+        errEl.innerText = 'Falha ao autenticar com o servidor.';
+        errEl.style.display = 'block';
+      }
+    }
+
+    function bloquearPainelFrotas() {
+      sessionStorage.removeItem('frotaToken');
+      mostrarTelaBloqueioFrota(false);
+    }
+
+    function abrirModalAlterarPin() {
+      document.getElementById('frotaPinAtual').value = '';
+      document.getElementById('frotaPinNovo').value = '';
+      document.getElementById('modalFrotaPin').classList.add('active');
+    }
+
+    function fecharModalAlterarPin() {
+      document.getElementById('modalFrotaPin').classList.remove('active');
+    }
+
+    async function salvarNovoPinFrota() {
+      const pinAtual = document.getElementById('frotaPinAtual').value.trim();
+      const novoPin = document.getElementById('frotaPinNovo').value.trim();
+      if (!pinAtual || novoPin.length < 4) {
+        alert('Informe o PIN atual e um novo PIN com pelo menos 4 caracteres.');
+        return;
+      }
+      try {
+        const res = await frotasFetch('/api/frotas/alterar-pin', {
+          method: 'POST',
+          body: JSON.stringify({ pin_atual: pinAtual, novo_pin: novoPin })
+        });
+        const d = await res.json();
+        if (!res.ok) {
+          alert(d.erro || 'Não foi possível alterar o PIN.');
+          return;
+        }
+        fecharModalAlterarPin();
+        const avisoPadrao = document.getElementById('avisoPinPadraoFrota');
+        if (avisoPadrao) avisoPadrao.style.display = 'none';
+        alert('🔐 PIN alterado com sucesso! Guarde a sua nova senha.');
+      } catch (e) {
+        alert('Erro de conexão ao alterar o PIN.');
+      }
+    }
+
+    function calcularDiasVencimentoBr(dataBr) {
+      const partes = String(dataBr || '').split('/');
+      if (partes.length !== 3) return null;
+      const dtFim = new Date(Number(partes[2]), Number(partes[1]) - 1, Number(partes[0]));
+      if (isNaN(dtFim.getTime())) return null;
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+      return Math.round((dtFim - hoje) / 86400000);
+    }
+
+    async function carregarFrotasESeguros() {
+      if (!obterTokenFrota()) {
+        verificarAcessoFrotas();
+        return;
+      }
+      try {
+        const [resV, resA, resC] = await Promise.all([
+          frotasFetch('/api/frotas/veiculos'),
+          frotasFetch('/api/seguros/apolices'),
+          fetch('/api/clientes')
         ]);
+        if (resV.status === 401 || resA.status === 401) return;
+
         const veiculos = await resV.json();
         const apolices = await resA.json();
+        frotaClientesCache = resC.ok ? await resC.json() : [];
 
-        // Atualiza KPIs
-        document.getElementById('frotaTotalQtd').innerText = veiculos.length;
-        document.getElementById('frotaAlugadosQtd').innerText = veiculos.filter(v => v.status === 'ALUGADO').length;
-        document.getElementById('frotaDisponiveisQtd').innerText = veiculos.filter(v => v.status === 'DISPONIVEL').length;
-        document.getElementById('frotaApolicesQtd').innerText = apolices.length;
+        frotaVeiculosCache = Array.isArray(veiculos) ? veiculos : [];
+        frotaApolicesCache = Array.isArray(apolices) ? apolices : [];
 
-        // Renderiza tabela veiculos
-        const tbodyV = document.getElementById('tabelaVeiculos');
-        tbodyV.innerHTML = veiculos.map(v => `
-          <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
-            <td style="padding:10px; font-family:var(--font-mono); font-weight:800; font-size:1rem; color:#38bdf8;">${v.placa}</td>
-            <td style="padding:10px; font-weight:600;">${v.modelo} <br><small style="color:var(--text-muted);">${v.categoria || 'Passeio'} (${v.ano || 2024})</small></td>
-            <td style="padding:10px; font-family:var(--font-mono);">${Number(v.km || 0).toLocaleString('pt-BR')} km</td>
-            <td style="padding:10px; font-family:var(--font-mono); color:#10b981; font-weight:700;">R$ ${Number(v.diaria_valor || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}/dia</td>
-            <td style="padding:10px;">
-              <span style="background:${v.status === 'DISPONIVEL' ? 'rgba(34,197,94,0.15)' : 'rgba(245,158,11,0.15)'}; color:${v.status === 'DISPONIVEL' ? '#4ade80' : '#fbbf24'}; padding:3px 8px; border-radius:4px; font-size:0.75rem; font-weight:700;">
-                ${v.status}
-              </span>
-            </td>
-            <td style="padding:10px;">
-              ${v.ignicao ? '<span style="color:#22c55e; font-weight:700;">🟢 Ligada</span>' : '<span style="color:var(--text-muted);">🔴 Desligada</span>'}
-            </td>
-            <td style="padding:10px; font-size:0.8rem; color:var(--text-muted);">
-              📍 ${v.gps?.endereco || 'São Paulo - SP'}<br>
-              <small style="color:#60a5fa; font-family:var(--font-mono);">ID: ${v.rastreador_id || 'SAT-0000'}</small>
-            </td>
-            <td style="padding:10px; text-align:center;">
-              <button onclick="acionarBloqueioSatelite('${v.placa}')" class="btn-acao" style="background:${v.bloqueado ? '#22c55e' : '#ef4444'}; color:#fff; padding:6px 12px; font-size:0.8rem; font-weight:700; border-radius:6px; cursor:pointer;">
-                ${v.bloqueado ? '🔓 Desbloquear Veículo' : '🚨 Cortar Ignição (Bloquear)'}
-              </button>
-            </td>
-          </tr>
-        `).join('');
+        const qtdAlugados = frotaVeiculosCache.filter(v => v.status === 'ALUGADO').length;
+        const qtdDisponiveis = frotaVeiculosCache.filter(v => v.status === 'DISPONIVEL').length;
+        const qtdManutencao = frotaVeiculosCache.filter(v => v.status === 'MANUTENCAO').length;
+        const qtdBloqueados = frotaVeiculosCache.filter(v => Boolean(v.bloqueado)).length;
 
-        // Renderiza tabela apolices
-        const tbodyA = document.getElementById('tabelaApolices');
-        tbodyA.innerHTML = apolices.map(a => `
-          <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
-            <td style="padding:10px; font-family:var(--font-mono); font-weight:700; color:#a855f7;">${a.numero_apolice}</td>
-            <td style="padding:10px; font-weight:700; color:#38bdf8;">${a.veiculo_placa}</td>
-            <td style="padding:10px; font-weight:600;">${a.cliente_nome}</td>
-            <td style="padding:10px;"><span style="background:rgba(168,85,247,0.15); color:#c084fc; padding:3px 8px; border-radius:4px; font-size:0.75rem;">${a.tipo}</span></td>
-            <td style="padding:10px; font-family:var(--font-mono);">R$ ${Number(a.franquia || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
-            <td style="padding:10px; font-family:var(--font-mono); font-weight:700; color:#10b981;">R$ ${Number(a.valor_mensal || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}/mês</td>
-            <td style="padding:10px; color:var(--text-muted);">${a.vigencia_fim || '31/12/2026'}</td>
-            <td style="padding:10px;"><span style="background:rgba(34,197,94,0.15); color:#4ade80; padding:3px 8px; border-radius:4px; font-size:0.75rem; font-weight:700;">${a.status}</span></td>
-          </tr>
-        `).join('');
+        let vencendoOuVencidas = 0;
+        frotaApolicesCache.forEach(a => {
+          const dias = calcularDiasVencimentoBr(a.vigencia_fim);
+          if (dias !== null && dias <= 30) vencendoOuVencidas += 1;
+        });
 
+        document.getElementById('frotaTotalQtd').innerText = frotaVeiculosCache.length;
+        document.getElementById('frotaAlugadosQtd').innerText = qtdAlugados;
+        document.getElementById('frotaDisponiveisQtd').innerText = qtdDisponiveis;
+        document.getElementById('frotaIndisponiveisQtd').innerText = qtdManutencao + qtdBloqueados;
+        document.getElementById('frotaIndisponiveisDetalhe').innerText = `${qtdManutencao} oficina • ${qtdBloqueados} travados`;
+        document.getElementById('frotaApolicesQtd').innerText = frotaApolicesCache.length;
+        document.getElementById('frotaApolicesAlerta').innerText = vencendoOuVencidas > 0
+          ? `⚠️ ${vencendoOuVencidas} vencendo/vencida(s)`
+          : 'Todas em dia';
+
+        filtrarFrotas();
+        renderizarTabelaApolices(frotaApolicesCache);
       } catch (e) {
         console.error('Erro ao carregar frotas e seguros:', e);
       }
     }
 
+    function filtrarFrotas() {
+      const termo = (document.getElementById('buscaFrotaInput')?.value || '').toLowerCase().trim();
+      const filtroStatus = document.getElementById('filtroStatusFrota')?.value || 'TODOS';
+
+      const filtrados = frotaVeiculosCache.filter(v => {
+        const matchTexto = !termo ||
+          (v.placa || '').toLowerCase().includes(termo) ||
+          (v.modelo || '').toLowerCase().includes(termo) ||
+          (v.locacao_atual?.cliente_nome || '').toLowerCase().includes(termo);
+        if (!matchTexto) return false;
+        if (filtroStatus === 'TODOS') return true;
+        if (filtroStatus === 'BLOQUEADO') return Boolean(v.bloqueado);
+        return v.status === filtroStatus;
+      });
+
+      renderizarTabelaVeiculos(filtrados);
+    }
+
+    function renderizarTabelaVeiculos(lista) {
+      const tbodyV = document.getElementById('tabelaVeiculos');
+      tbodyV.innerHTML = '';
+
+      if (!lista.length) {
+        tbodyV.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:24px; color:var(--text-muted);">Nenhum veículo encontrado com os filtros atuais.</td></tr>';
+        return;
+      }
+
+      tbodyV.innerHTML = lista.map(v => {
+        const placa = escaparHtml(v.placa);
+        const modelo = escaparHtml(v.modelo);
+        const cat = escaparHtml(v.categoria || 'Passeio');
+        const ano = Number(v.ano || 2024);
+        const kmFmt = Number(v.km || 0).toLocaleString('pt-BR');
+        const diariaFmt = Number(v.diaria_valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+        const rastreador = escaparHtml(v.rastreador_id || 'SAT-0000');
+        const endGps = escaparHtml(v.gps?.endereco || 'São Paulo - SP');
+        const lat = Number(v.gps?.lat ?? -23.5505);
+        const lng = Number(v.gps?.lng ?? -46.6333);
+        const mapUrl = `https://www.google.com/maps?q=${encodeURIComponent(lat + ',' + lng)}`;
+
+        let corStatusBg = 'rgba(34,197,94,0.15)';
+        let corStatusTxt = '#4ade80';
+        if (v.status === 'ALUGADO') {
+          corStatusBg = 'rgba(245,158,11,0.15)';
+          corStatusTxt = '#fbbf24';
+        } else if (v.status === 'MANUTENCAO') {
+          corStatusBg = 'rgba(239,68,68,0.15)';
+          corStatusTxt = '#f87171';
+        }
+
+        const infoLocacao = v.status === 'ALUGADO' && v.locacao_atual
+          ? `<div style="font-size:0.75rem; color:#fde68a; margin-top:4px;">👤 ${escaparHtml(v.locacao_atual.cliente_nome)}<br>⏳ Retorno: ${escaparHtml(v.locacao_atual.data_prevista_retorno || '-')}</div>`
+          : '';
+
+        const infoCmd = v.ultimo_comando
+          ? `<div style="font-size:0.72rem; color:#94a3b8; margin-top:4px;">🕒 ${escaparHtml(v.ultimo_comando.tipo)} (${escaparHtml(v.ultimo_comando.data_hora)})</div>`
+          : '';
+
+        const btnLocacao = v.status === 'DISPONIVEL'
+          ? `<button data-acao="alugar" data-placa="${placa}" class="btn-acao btn-sucesso" style="padding:5px 9px; font-size:0.76rem;">🔑 Alugar</button>`
+          : (v.status === 'ALUGADO'
+            ? `<button data-acao="devolver" data-placa="${placa}" class="btn-acao btn-primario" style="padding:5px 9px; font-size:0.76rem;">🏁 Devolver</button>`
+            : '');
+
+        return `
+          <tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
+            <td style="padding:10px; font-family:var(--font-mono); font-weight:800; font-size:0.98rem; color:#38bdf8;">${placa}</td>
+            <td style="padding:10px; font-weight:600;">${modelo}<br><small style="color:var(--text-muted);">${cat} (${ano})</small></td>
+            <td style="padding:10px; font-family:var(--font-mono);">
+              ${kmFmt} km<br>
+              <strong style="color:#10b981;">R$ ${diariaFmt}/dia</strong>
+            </td>
+            <td style="padding:10px;">
+              <span style="background:${corStatusBg}; color:${corStatusTxt}; padding:3px 8px; border-radius:4px; font-size:0.75rem; font-weight:700;">
+                ${escaparHtml(v.status)}
+              </span>
+              ${infoLocacao}
+            </td>
+            <td style="padding:10px; font-size:0.82rem;">
+              ${v.ignicao ? '<span style="color:#22c55e; font-weight:700;">🟢 Ignição Ligada</span>' : '<span style="color:var(--text-muted);">🔴 Ignição Desligada</span>'}
+              <div style="margin-top:4px;">
+                ${v.bloqueado ? '<span style="background:rgba(239,68,68,0.2); color:#f87171; padding:2px 6px; border-radius:4px; font-size:0.72rem; font-weight:700;">🚨 BLOQUEADO</span>' : '<span style="color:#34d399; font-size:0.74rem;">🛡️ Partida Liberada</span>'}
+              </div>
+            </td>
+            <td style="padding:10px; font-size:0.8rem; color:var(--text-muted);">
+              📍 ${endGps}<br>
+              <a href="${mapUrl}" target="_blank" rel="noopener noreferrer" class="mapa-link">🗺️ Abrir no Mapa</a>
+              <span style="color:#60a5fa; font-family:var(--font-mono); font-size:0.72rem; margin-left:6px;">(${rastreador})</span>
+              ${infoCmd}
+            </td>
+            <td style="padding:10px; text-align:center;">
+              <div style="display:flex; gap:5px; justify-content:center; flex-wrap:wrap;">
+                ${btnLocacao}
+                <button data-acao="editar" data-placa="${placa}" class="btn-acao btn-secundario" style="padding:5px 9px; font-size:0.76rem;" title="Editar veículo">✏️</button>
+                <button data-acao="bloquear" data-placa="${placa}" class="btn-acao ${v.bloqueado ? 'btn-sucesso' : 'btn-perigo'}" style="padding:5px 9px; font-size:0.76rem;">
+                  ${v.bloqueado ? '🔓 Desbloquear' : '🚨 Bloquear'}
+                </button>
+                <button data-acao="excluir" data-placa="${placa}" class="btn-acao btn-secundario" style="padding:5px 8px; font-size:0.76rem; color:#f87171;" title="Remover veículo">🗑️</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      tbodyV.querySelectorAll('button[data-acao]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const acao = btn.dataset.acao;
+          const placa = btn.dataset.placa;
+          if (acao === 'alugar') abrirModalLocacao(placa);
+          else if (acao === 'devolver') abrirModalDevolucao(placa);
+          else if (acao === 'editar') abrirModalVeiculo(placa);
+          else if (acao === 'bloquear') acionarBloqueioSatelite(placa);
+          else if (acao === 'excluir') excluirVeiculoFrota(placa);
+        });
+      });
+    }
+
+    function renderizarTabelaApolices(lista) {
+      const tbodyA = document.getElementById('tabelaApolices');
+      if (!lista.length) {
+        tbodyA.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:20px; color:var(--text-muted);">Nenhuma apólice cadastrada. Clique em ➕ Nova Apólice.</td></tr>';
+        return;
+      }
+
+      tbodyA.innerHTML = lista.map(a => {
+        const num = escaparHtml(a.numero_apolice);
+        const placa = escaparHtml(a.veiculo_placa);
+        const cli = escaparHtml(a.cliente_nome);
+        const seg = escaparHtml(a.seguradora || '-');
+        const tipo = escaparHtml(a.tipo);
+        const vig = escaparHtml(a.vigencia_fim || '-');
+        const franquiaFmt = Number(a.franquia || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+        const mensalFmt = Number(a.valor_mensal || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+
+        const diasRest = calcularDiasVencimentoBr(a.vigencia_fim);
+        let alertaVig = '';
+        if (diasRest !== null && diasRest < 0) {
+          alertaVig = '<br><span style="color:#f87171; font-size:0.72rem; font-weight:700;">🔴 VENCIDA</span>';
+        } else if (diasRest !== null && diasRest <= 30) {
+          alertaVig = `<br><span style="color:#fbbf24; font-size:0.72rem; font-weight:700;">🟠 Vence em ${diasRest}d</span>`;
+        }
+
+        return `
+          <tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
+            <td style="padding:10px; font-family:var(--font-mono); font-weight:700; color:#a855f7;">${num}</td>
+            <td style="padding:10px; font-family:var(--font-mono); font-weight:700; color:#38bdf8;">${placa}</td>
+            <td style="padding:10px; font-weight:600;">${cli}<br><small style="color:var(--text-muted);">${seg}</small></td>
+            <td style="padding:10px;"><span style="background:rgba(168,85,247,0.15); color:#c084fc; padding:3px 8px; border-radius:4px; font-size:0.75rem;">${tipo}</span></td>
+            <td style="padding:10px; font-family:var(--font-mono);">R$ ${franquiaFmt}</td>
+            <td style="padding:10px; font-family:var(--font-mono); font-weight:700; color:#10b981;">R$ ${mensalFmt}/mês</td>
+            <td style="padding:10px; color:var(--text-muted);">${vig}${alertaVig}</td>
+            <td style="padding:10px;"><span style="background:rgba(34,197,94,0.15); color:#4ade80; padding:3px 8px; border-radius:4px; font-size:0.75rem; font-weight:700;">${escaparHtml(a.status || 'ATIVA')}</span></td>
+            <td style="padding:10px; text-align:center;">
+              <button data-apolice="${num}" class="btn-lixeira" title="Excluir apólice">🗑️</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      tbodyA.querySelectorAll('button[data-apolice]').forEach(btn => {
+        btn.addEventListener('click', () => excluirApoliceFrota(btn.dataset.apolice));
+      });
+    }
+
     async function acionarBloqueioSatelite(placa) {
-      if (!confirm(`Confirma o envio do sinal de satélite para alterar o status do veículo ${placa}?`)) return;
+      const v = frotaVeiculosCache.find(x => x.placa === placa);
+      const acaoTxt = v && v.bloqueado ? 'DESBLOQUEAR (liberar partida)' : 'BLOQUEAR (cortar ignição)';
+      if (!confirm(`Confirma enviar comando para ${acaoTxt} o veículo ${placa}?`)) return;
       try {
-        const res = await fetch('/api/frotas/bloqueio', {
+        const res = await frotasFetch('/api/frotas/bloqueio', {
           method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({placa: placa})
+          body: JSON.stringify({ placa })
         });
         const d = await res.json();
-        if (d.sucesso) {
-          alert(`📡 TELEMETRIA CONFIRMADA VIA SATÉLITE:
-${d.mensagem}`);
-          carregarFrotasESeguros();
+        if (res.ok && d.sucesso) {
+          alert(`📡 TELEMETRIA REGISTRADA:\n${d.mensagem}`);
+          await carregarFrotasESeguros();
         } else {
-          alert('Erro no comando de satélite: ' + (d.erro || 'Falha na transmissão'));
+          alert('Erro no comando: ' + (d.erro || 'Falha na transmissão'));
         }
       } catch (e) {
         alert('Erro ao transmitir comando de bloqueio.');
       }
     }
 
-    async function abrirModalVeiculo() {
-      const placa = prompt('Placa do veículo (padrão Mercosul):');
-      if (!placa) return;
-      const modelo = prompt('Modelo do veículo (ex: Fiat Strada 1.3):') || 'Veículo';
-      const diaria = parseFloat(prompt('Valor da diária (R$):', '150')) || 150;
-      const km = parseFloat(prompt('Km atual:', '20000')) || 20000;
-      
+    function abrirModalVeiculo(placaEdicao = '') {
+      const v = placaEdicao ? frotaVeiculosCache.find(x => x.placa === placaEdicao) : null;
+      document.getElementById('fvModo').value = v ? 'editar' : 'criar';
+      document.getElementById('fvTitulo').innerText = v ? `✏️ Editar Veículo ${v.placa}` : '🚗 Cadastrar Novo Veículo';
+      const inpPlaca = document.getElementById('fvPlaca');
+      inpPlaca.value = v ? v.placa : '';
+      inpPlaca.disabled = Boolean(v);
+      document.getElementById('fvModelo').value = v ? (v.modelo || '') : '';
+      document.getElementById('fvAno').value = v ? (v.ano || 2024) : 2025;
+      document.getElementById('fvCategoria').value = v ? (v.categoria || 'Passeio / Executivo') : 'Passeio / Executivo';
+      document.getElementById('fvDiaria').value = v ? (v.diaria_valor || 150) : 150;
+      document.getElementById('fvKm').value = v ? (v.km || 0) : 0;
+      const selStatus = document.getElementById('fvStatus');
+      selStatus.value = v ? (v.status || 'DISPONIVEL') : 'DISPONIVEL';
+      selStatus.disabled = Boolean(v && v.status === 'ALUGADO');
+      document.getElementById('fvRastreador').value = v ? (v.rastreador_id || '') : '';
+      document.getElementById('fvEndereco').value = v ? (v.gps?.endereco || '') : 'Pátio Central - Garagem Matriz SP';
+      document.getElementById('fvLat').value = v ? (v.gps?.lat ?? -23.5505) : -23.5505;
+      document.getElementById('fvLng').value = v ? (v.gps?.lng ?? -46.6333) : -46.6333;
+      document.getElementById('modalFrotaVeiculo').classList.add('active');
+    }
+
+    function fecharModalFrotaVeiculo() {
+      document.getElementById('modalFrotaVeiculo').classList.remove('active');
+    }
+
+    async function salvarVeiculoModal() {
+      const modo = document.getElementById('fvModo').value;
+      const placa = document.getElementById('fvPlaca').value.trim().toUpperCase();
+      const modelo = document.getElementById('fvModelo').value.trim();
+      const ano = parseInt(document.getElementById('fvAno').value, 10);
+      const categoria = document.getElementById('fvCategoria').value;
+      const diaria = parseFloat(document.getElementById('fvDiaria').value);
+      const km = parseFloat(document.getElementById('fvKm').value);
+      const status = document.getElementById('fvStatus').value;
+      const rastreador = document.getElementById('fvRastreador').value.trim();
+      const endereco = document.getElementById('fvEndereco').value.trim();
+      const lat = parseFloat(document.getElementById('fvLat').value);
+      const lng = parseFloat(document.getElementById('fvLng').value);
+
+      if (!placa || !modelo || isNaN(diaria) || diaria <= 0 || isNaN(km) || km < 0) {
+        alert('Preencha placa válida, modelo, quilometragem (>= 0) e diária maior que zero.');
+        return;
+      }
+
+      const payload = {
+        modo,
+        placa,
+        modelo,
+        ano,
+        categoria,
+        diaria_valor: diaria,
+        km,
+        status,
+        rastreador_id: rastreador || undefined,
+        gps: { lat: isNaN(lat) ? -23.5505 : lat, lng: isNaN(lng) ? -46.6333 : lng, endereco }
+      };
+
       try {
-        await fetch('/api/frotas/veiculos', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({placa: placa, modelo: modelo, diaria_valor: diaria, km: km, status: 'DISPONIVEL', ignicao: false, bloqueado: false})
-        });
-        carregarFrotasESeguros();
-        alert(`Veículo ${placa} cadastrado com sucesso na frota!`);
+        const url = modo === 'editar' ? `/api/frotas/veiculos/${encodeURIComponent(placa)}` : '/api/frotas/veiculos';
+        const method = modo === 'editar' ? 'PUT' : 'POST';
+        const res = await frotasFetch(url, { method, body: JSON.stringify(payload) });
+        const d = await res.json();
+        if (!res.ok) {
+          alert(d.erro || 'Erro ao salvar veículo.');
+          return;
+        }
+        fecharModalFrotaVeiculo();
+        await carregarFrotasESeguros();
       } catch (e) {
-        alert('Erro ao cadastrar veículo.');
+        alert('Falha de conexão ao salvar veículo.');
+      }
+    }
+
+    async function excluirVeiculoFrota(placa) {
+      if (!confirm(`Deseja realmente remover o veículo ${placa} da frota?`)) return;
+      try {
+        const res = await frotasFetch(`/api/frotas/veiculos/${encodeURIComponent(placa)}`, { method: 'DELETE' });
+        const d = await res.json();
+        if (!res.ok) {
+          alert(d.erro || 'Não foi possível excluir o veículo.');
+          return;
+        }
+        await carregarFrotasESeguros();
+      } catch (e) {
+        alert('Erro ao excluir veículo.');
+      }
+    }
+
+    function abrirModalLocacao(placa) {
+      const v = frotaVeiculosCache.find(x => x.placa === placa);
+      if (!v) return;
+      document.getElementById('flPlaca').value = v.placa;
+      document.getElementById('flResumoVeiculo').innerText = `${v.placa} — ${v.modelo} (Diária: R$ ${Number(v.diaria_valor || 0).toFixed(2)})`;
+      document.getElementById('flDiariaBase').value = Number(v.diaria_valor || 150);
+
+      const selCli = document.getElementById('flClienteSelect');
+      selCli.innerHTML = '<option value="">-- Selecionar cliente do CRM ou digitar abaixo --</option>';
+      frotaClientesCache.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.cpf_cnpj;
+        opt.innerText = `${c.nome} (${c.cpf_cnpj})`;
+        opt.dataset.nome = c.nome;
+        selCli.appendChild(opt);
+      });
+
+      document.getElementById('flClienteNome').value = '';
+      document.getElementById('flClienteCpf').value = '';
+      document.getElementById('flDias').value = 3;
+      document.getElementById('flDesconto').value = 0;
+      document.getElementById('flFormaPagamento').value = 'PIX';
+      const retorno = new Date(Date.now() + 3 * 86400000);
+      document.getElementById('flDataRetorno').value = retorno.toLocaleDateString('pt-BR');
+      document.getElementById('flObs').value = '';
+      atualizarPreviewLocacao();
+      document.getElementById('modalFrotaLocacao').classList.add('active');
+    }
+
+    function fecharModalFrotaLocacao() {
+      document.getElementById('modalFrotaLocacao').classList.remove('active');
+    }
+
+    function aoTrocarClienteLocacao() {
+      const sel = document.getElementById('flClienteSelect');
+      const opt = sel.options[sel.selectedIndex];
+      if (opt && opt.value) {
+        document.getElementById('flClienteNome').value = opt.dataset.nome || '';
+        document.getElementById('flClienteCpf').value = opt.value;
+      }
+    }
+
+    function atualizarPreviewLocacao() {
+      const diaria = parseFloat(document.getElementById('flDiariaBase').value) || 0;
+      const dias = Math.max(1, parseInt(document.getElementById('flDias').value, 10) || 1);
+      const desc = Math.max(0, parseFloat(document.getElementById('flDesconto').value) || 0);
+      const total = Math.max(0, (diaria * dias) - desc);
+      document.getElementById('flPreviewTotal').innerText = `R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+      const dt = new Date(Date.now() + dias * 86400000);
+      document.getElementById('flDataRetorno').value = dt.toLocaleDateString('pt-BR');
+    }
+
+    async function confirmarLocacaoFrota() {
+      const placa = document.getElementById('flPlaca').value;
+      const clienteNome = document.getElementById('flClienteNome').value.trim();
+      const clienteCpf = document.getElementById('flClienteCpf').value.trim();
+      const dias = parseInt(document.getElementById('flDias').value, 10);
+      const desconto = parseFloat(document.getElementById('flDesconto').value) || 0;
+      const forma = document.getElementById('flFormaPagamento').value;
+      const dataRetorno = document.getElementById('flDataRetorno').value.trim();
+      const obs = document.getElementById('flObs').value.trim();
+
+      if (!clienteNome) {
+        alert('Selecione um cliente do CRM ou digite o nome do locatário.');
+        return;
+      }
+      try {
+        const res = await frotasFetch('/api/frotas/locacao', {
+          method: 'POST',
+          body: JSON.stringify({
+            acao: 'alugar',
+            placa,
+            cliente_nome: clienteNome,
+            cliente_cpf: clienteCpf,
+            dias,
+            desconto_valor: desconto,
+            forma_pagamento: forma,
+            data_prevista_retorno: dataRetorno,
+            observacoes: obs
+          })
+        });
+        const d = await res.json();
+        if (!res.ok) {
+          alert(d.erro || 'Não foi possível registrar a locação.');
+          return;
+        }
+        fecharModalFrotaLocacao();
+        tocarSomCaixaRegistradora();
+        alert(`🔑 ${d.mensagem}`);
+        await carregarFrotasESeguros();
+      } catch (e) {
+        alert('Erro de conexão ao registrar locação.');
+      }
+    }
+
+    function abrirModalDevolucao(placa) {
+      const v = frotaVeiculosCache.find(x => x.placa === placa);
+      if (!v) return;
+      document.getElementById('fdPlaca').value = v.placa;
+      document.getElementById('fdDiariaBase').value = Number(v.diaria_valor || 150);
+      const kmAtual = Number(v.km || 0);
+      document.getElementById('fdResumoDevolucao').innerText = `${v.placa} — ${v.modelo} | Cliente: ${v.locacao_atual?.cliente_nome || 'Locatário'} | Km Saída: ${kmAtual.toLocaleString('pt-BR')} km`;
+      const inpKm = document.getElementById('fdKmFinal');
+      inpKm.min = kmAtual;
+      inpKm.value = kmAtual;
+      document.getElementById('fdDiariasExtras').value = 0;
+      document.getElementById('fdTaxaExtra').value = 0;
+      document.getElementById('fdFormaPagamentoExtra').value = 'PIX';
+      atualizarPreviewDevolucao();
+      document.getElementById('modalFrotaDevolucao').classList.add('active');
+    }
+
+    function fecharModalFrotaDevolucao() {
+      document.getElementById('modalFrotaDevolucao').classList.remove('active');
+    }
+
+    function atualizarPreviewDevolucao() {
+      const diaria = parseFloat(document.getElementById('fdDiariaBase').value) || 0;
+      const extras = Math.max(0, parseInt(document.getElementById('fdDiariasExtras').value, 10) || 0);
+      const taxa = Math.max(0, parseFloat(document.getElementById('fdTaxaExtra').value) || 0);
+      const total = (extras * diaria) + taxa;
+      document.getElementById('fdPreviewExtra').innerText = `R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+    }
+
+    async function confirmarDevolucaoFrota() {
+      const placa = document.getElementById('fdPlaca').value;
+      const kmFinal = parseFloat(document.getElementById('fdKmFinal').value);
+      const diariasExtras = parseInt(document.getElementById('fdDiariasExtras').value, 10) || 0;
+      const taxaExtra = parseFloat(document.getElementById('fdTaxaExtra').value) || 0;
+      const formaExtra = document.getElementById('fdFormaPagamentoExtra').value;
+
+      if (isNaN(kmFinal) || kmFinal < 0) {
+        alert('Informe uma quilometragem final válida.');
+        return;
+      }
+      try {
+        const res = await frotasFetch('/api/frotas/locacao', {
+          method: 'POST',
+          body: JSON.stringify({
+            acao: 'devolver',
+            placa,
+            km_final: kmFinal,
+            diarias_extras: diariasExtras,
+            taxa_extra: taxaExtra,
+            forma_pagamento_extra: formaExtra
+          })
+        });
+        const d = await res.json();
+        if (!res.ok) {
+          alert(d.erro || 'Não foi possível concluir a devolução.');
+          return;
+        }
+        fecharModalFrotaDevolucao();
+        if (d.valor_extras > 0) tocarSomCaixaRegistradora();
+        alert(`🏁 ${d.mensagem}`);
+        await carregarFrotasESeguros();
+      } catch (e) {
+        alert('Erro de conexão ao registrar devolução.');
+      }
+    }
+
+    function abrirModalApolice() {
+      if (!frotaVeiculosCache.length) {
+        alert('Cadastre pelo menos um veículo na frota antes de emitir uma apólice.');
+        return;
+      }
+      const selPlaca = document.getElementById('faPlaca');
+      selPlaca.innerHTML = frotaVeiculosCache.map(v => `<option value="${escaparHtml(v.placa)}">${escaparHtml(v.placa)} — ${escaparHtml(v.modelo)}</option>`).join('');
+
+      const dlClientes = document.getElementById('listaClientesApolice');
+      dlClientes.innerHTML = frotaClientesCache.map(c => `<option value="${escaparHtml(c.nome)}"></option>`).join('');
+
+      document.getElementById('faNumero').value = '';
+      document.getElementById('faCliente').value = '';
+      document.getElementById('faTipo').value = 'Locação com Seguro Total + Rastreador';
+      document.getElementById('faSeguradora').value = 'Porto Seguro Corporativo';
+      document.getElementById('faFranquia').value = 2000;
+      document.getElementById('faValorMensal').value = 1800;
+      document.getElementById('faVigencia').value = '31/12/2027';
+      document.getElementById('modalFrotaApolice').classList.add('active');
+    }
+
+    function fecharModalFrotaApolice() {
+      document.getElementById('modalFrotaApolice').classList.remove('active');
+    }
+
+    async function salvarApoliceModal() {
+      const numero = document.getElementById('faNumero').value.trim().toUpperCase();
+      const placa = document.getElementById('faPlaca').value;
+      const cliente = document.getElementById('faCliente').value.trim();
+      const tipo = document.getElementById('faTipo').value.trim();
+      const seguradora = document.getElementById('faSeguradora').value.trim();
+      const franquia = parseFloat(document.getElementById('faFranquia').value);
+      const valorMensal = parseFloat(document.getElementById('faValorMensal').value);
+      const vigencia = document.getElementById('faVigencia').value.trim();
+
+      if (!placa || !cliente || isNaN(valorMensal) || valorMensal <= 0 || !vigencia) {
+        alert('Preencha placa, cliente, valor mensal (> 0) e data de vigência (DD/MM/AAAA).');
+        return;
+      }
+      try {
+        const res = await frotasFetch('/api/seguros/apolices', {
+          method: 'POST',
+          body: JSON.stringify({
+            numero_apolice: numero || undefined,
+            veiculo_placa: placa,
+            cliente_nome: cliente,
+            tipo,
+            seguradora,
+            franquia: isNaN(franquia) ? 0 : franquia,
+            valor_mensal: valorMensal,
+            vigencia_fim: vigencia,
+            status: 'ATIVA'
+          })
+        });
+        const d = await res.json();
+        if (!res.ok) {
+          alert(d.erro || 'Erro ao gravar apólice.');
+          return;
+        }
+        fecharModalFrotaApolice();
+        await carregarFrotasESeguros();
+      } catch (e) {
+        alert('Falha de conexão ao salvar apólice.');
+      }
+    }
+
+    async function excluirApoliceFrota(numero) {
+      if (!confirm(`Remover a apólice ${numero}?`)) return;
+      try {
+        const res = await frotasFetch(`/api/seguros/apolices/${encodeURIComponent(numero)}`, { method: 'DELETE' });
+        const d = await res.json();
+        if (!res.ok) {
+          alert(d.erro || 'Erro ao remover apólice.');
+          return;
+        }
+        await carregarFrotasESeguros();
+      } catch (e) {
+        alert('Erro de conexão ao remover apólice.');
       }
     }
 
@@ -2470,6 +3250,268 @@ ${d.mensagem}`);
         </div>
         <button onclick="salvarProdutoRapidoEBipar()" class="btn btn-primario" style="margin-top:10px; padding:12px; font-weight:700; font-size:0.95rem;">
           💾 Salvar e Adicionar à Venda
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 3: CADASTRAR / EDITAR VEÍCULO DA FROTA -->
+  <div id="modalFrotaVeiculo" class="modal-overlay">
+    <div class="modal-box">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <h3 id="fvTitulo" style="font-size:1.1rem; font-weight:700; color:#38bdf8;">🚗 Cadastrar Novo Veículo</h3>
+        <button onclick="fecharModalFrotaVeiculo()" style="background:none; border:none; color:#ef4444; font-size:1.4rem; cursor:pointer;">✖</button>
+      </div>
+      <input type="hidden" id="fvModo" value="criar">
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+          <div>
+            <label style="font-size:0.75rem; color:var(--text-muted);">Placa (Mercosul ou Antiga):</label>
+            <input type="text" id="fvPlaca" class="input-form" style="width:100%; font-family:var(--font-mono); text-transform:uppercase;" placeholder="BRA2E19">
+          </div>
+          <div>
+            <label style="font-size:0.75rem; color:var(--text-muted);">Ano:</label>
+            <input type="number" id="fvAno" class="input-form" style="width:100%;" value="2025">
+          </div>
+        </div>
+        <div>
+          <label style="font-size:0.75rem; color:var(--text-muted);">Modelo Completo:</label>
+          <input type="text" id="fvModelo" class="input-form" style="width:100%;" placeholder="Ex: Fiat Strada Endurance 1.3">
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+          <div>
+            <label style="font-size:0.75rem; color:var(--text-muted);">Categoria:</label>
+            <select id="fvCategoria" class="input-form" style="width:100%;">
+              <option value="Passeio / Executivo">Passeio / Executivo</option>
+              <option value="Utilitário / Carga">Utilitário / Carga</option>
+              <option value="Caminhão Leve">Caminhão Leve</option>
+              <option value="Motocicleta">Motocicleta</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:0.75rem; color:var(--text-muted);">Status:</label>
+            <select id="fvStatus" class="input-form" style="width:100%;">
+              <option value="DISPONIVEL">DISPONIVEL</option>
+              <option value="MANUTENCAO">MANUTENCAO</option>
+              <option value="ALUGADO">ALUGADO</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
+          <div>
+            <label style="font-size:0.75rem; color:var(--text-muted);">Diária (R$):</label>
+            <input type="number" step="0.01" id="fvDiaria" class="input-form" style="width:100%;" value="150">
+          </div>
+          <div>
+            <label style="font-size:0.75rem; color:var(--text-muted);">Km Atual:</label>
+            <input type="number" step="1" id="fvKm" class="input-form" style="width:100%;" value="0">
+          </div>
+          <div>
+            <label style="font-size:0.75rem; color:var(--text-muted);">ID Rastreador:</label>
+            <input type="text" id="fvRastreador" class="input-form" style="width:100%; font-family:var(--font-mono);" placeholder="SAT-1234">
+          </div>
+        </div>
+        <div>
+          <label style="font-size:0.75rem; color:var(--text-muted);">Endereço Base / GPS:</label>
+          <input type="text" id="fvEndereco" class="input-form" style="width:100%;" placeholder="Pátio Central - SP">
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+          <div>
+            <label style="font-size:0.75rem; color:var(--text-muted);">Latitude:</label>
+            <input type="number" step="0.0001" id="fvLat" class="input-form" style="width:100%; font-family:var(--font-mono);" value="-23.5505">
+          </div>
+          <div>
+            <label style="font-size:0.75rem; color:var(--text-muted);">Longitude:</label>
+            <input type="number" step="0.0001" id="fvLng" class="input-form" style="width:100%; font-family:var(--font-mono);" value="-46.6333">
+          </div>
+        </div>
+        <button onclick="salvarVeiculoModal()" class="btn-acao btn-sucesso" style="margin-top:8px; padding:12px;">
+          💾 Gravar Veículo no Atlas
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 4: ALUGAR VEÍCULO INTEGRADO AO PDV/CAIXA -->
+  <div id="modalFrotaLocacao" class="modal-overlay">
+    <div class="modal-box">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <h3 style="font-size:1.1rem; font-weight:700; color:#10b981;">🔑 Iniciar Locação (Integrada ao Caixa)</h3>
+        <button onclick="fecharModalFrotaLocacao()" style="background:none; border:none; color:#ef4444; font-size:1.4rem; cursor:pointer;">✖</button>
+      </div>
+      <div id="flResumoVeiculo" style="background:rgba(56,189,248,0.1); border:1px solid rgba(56,189,248,0.3); border-radius:8px; padding:8px 12px; font-size:0.85rem; color:#bae6fd; margin-bottom:10px;"></div>
+      <input type="hidden" id="flPlaca">
+      <input type="hidden" id="flDiariaBase">
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <div>
+          <label style="font-size:0.75rem; color:var(--text-muted);">Selecionar Cliente do CRM:</label>
+          <select id="flClienteSelect" onchange="aoTrocarClienteLocacao()" class="input-form" style="width:100%;"></select>
+        </div>
+        <div style="display:grid; grid-template-columns:2fr 1fr; gap:8px;">
+          <div>
+            <label style="font-size:0.75rem; color:var(--text-muted);">Nome do Locatário:</label>
+            <input type="text" id="flClienteNome" class="input-form" style="width:100%;" placeholder="Nome completo ou empresa">
+          </div>
+          <div>
+            <label style="font-size:0.75rem; color:var(--text-muted);">CPF/CNPJ:</label>
+            <input type="text" id="flClienteCpf" class="input-form" style="width:100%;" placeholder="Para Fiado">
+          </div>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
+          <div>
+            <label style="font-size:0.75rem; color:var(--text-muted);">Qtd Diárias:</label>
+            <input type="number" min="1" id="flDias" oninput="atualizarPreviewLocacao()" class="input-form" style="width:100%;" value="3">
+          </div>
+          <div>
+            <label style="font-size:0.75rem; color:var(--text-muted);">Desconto (R$):</label>
+            <input type="number" min="0" step="0.01" id="flDesconto" oninput="atualizarPreviewLocacao()" class="input-form" style="width:100%;" value="0">
+          </div>
+          <div>
+            <label style="font-size:0.75rem; color:var(--text-muted);">Retorno Previsto:</label>
+            <input type="text" id="flDataRetorno" class="input-form" style="width:100%;" placeholder="DD/MM/AAAA">
+          </div>
+        </div>
+        <div>
+          <label style="font-size:0.75rem; color:var(--text-muted);">Forma de Pagamento (Lança direto no Caixa):</label>
+          <select id="flFormaPagamento" class="input-form" style="width:100%;">
+            <option value="PIX">💠 PIX</option>
+            <option value="DINHEIRO">💵 Dinheiro</option>
+            <option value="CARTAO_DEBITO">💳 Cartão</option>
+            <option value="FIADO">📑 Fiado (CRM com limite)</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:0.75rem; color:var(--text-muted);">Observações / Vistoria de Saída:</label>
+          <input type="text" id="flObs" class="input-form" style="width:100%;" placeholder="Tanque cheio, sem avarias">
+        </div>
+        <div style="background:rgba(16,185,129,0.12); border:1px solid rgba(16,185,129,0.4); border-radius:8px; padding:10px; display:flex; justify-content:space-between; align-items:center;">
+          <span style="font-size:0.85rem; color:#6ee7b7; font-weight:700;">Total a Lançar no Caixa:</span>
+          <strong id="flPreviewTotal" style="font-family:var(--font-mono); font-size:1.3rem; color:#34d399;">R$ 0,00</strong>
+        </div>
+        <button onclick="confirmarLocacaoFrota()" class="btn-acao btn-sucesso" style="padding:12px;">
+          ✅ Confirmar Locação & Lançar no Caixa
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 5: DEVOLUÇÃO DE VEÍCULO -->
+  <div id="modalFrotaDevolucao" class="modal-overlay">
+    <div class="modal-box">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <h3 style="font-size:1.1rem; font-weight:700; color:#38bdf8;">🏁 Devolução & Check-in do Veículo</h3>
+        <button onclick="fecharModalFrotaDevolucao()" style="background:none; border:none; color:#ef4444; font-size:1.4rem; cursor:pointer;">✖</button>
+      </div>
+      <div id="fdResumoDevolucao" style="background:rgba(245,158,11,0.12); border:1px solid rgba(245,158,11,0.35); border-radius:8px; padding:8px 12px; font-size:0.84rem; color:#fde68a; margin-bottom:10px;"></div>
+      <input type="hidden" id="fdPlaca">
+      <input type="hidden" id="fdDiariaBase">
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <div>
+          <label style="font-size:0.75rem; color:var(--text-muted);">Odômetro Final (Km na entrega):</label>
+          <input type="number" step="1" id="fdKmFinal" class="input-form" style="width:100%; font-family:var(--font-mono);">
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+          <div>
+            <label style="font-size:0.75rem; color:var(--text-muted);">Diárias Extras (atraso):</label>
+            <input type="number" min="0" id="fdDiariasExtras" oninput="atualizarPreviewDevolucao()" class="input-form" style="width:100%;" value="0">
+          </div>
+          <div>
+            <label style="font-size:0.75rem; color:var(--text-muted);">Taxa Combustível / Avaria (R$):</label>
+            <input type="number" min="0" step="0.01" id="fdTaxaExtra" oninput="atualizarPreviewDevolucao()" class="input-form" style="width:100%;" value="0">
+          </div>
+        </div>
+        <div>
+          <label style="font-size:0.75rem; color:var(--text-muted);">Pagamento de Extras (se houver):</label>
+          <select id="fdFormaPagamentoExtra" class="input-form" style="width:100%;">
+            <option value="PIX">💠 PIX</option>
+            <option value="DINHEIRO">💵 Dinheiro</option>
+            <option value="CARTAO_DEBITO">💳 Cartão</option>
+            <option value="FIADO">📑 Fiado (CRM)</option>
+          </select>
+        </div>
+        <div style="background:rgba(56,189,248,0.1); border:1px solid rgba(56,189,248,0.3); border-radius:8px; padding:10px; display:flex; justify-content:space-between; align-items:center;">
+          <span style="font-size:0.85rem; color:#bae6fd; font-weight:700;">Total Acerto Extra:</span>
+          <strong id="fdPreviewExtra" style="font-family:var(--font-mono); font-size:1.25rem; color:#38bdf8;">R$ 0,00</strong>
+        </div>
+        <button onclick="confirmarDevolucaoFrota()" class="btn-acao btn-primario" style="padding:12px;">
+          🏁 Concluir Devolução ao Pátio
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 6: NOVA APÓLICE DE SEGURO -->
+  <div id="modalFrotaApolice" class="modal-overlay">
+    <div class="modal-box">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <h3 style="font-size:1.1rem; font-weight:700; color:#a855f7;">🛡️ Cadastrar Apólice / Contrato</h3>
+        <button onclick="fecharModalFrotaApolice()" style="background:none; border:none; color:#ef4444; font-size:1.4rem; cursor:pointer;">✖</button>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+          <div>
+            <label style="font-size:0.75rem; color:var(--text-muted);">Nº Apólice (vazio = auto):</label>
+            <input type="text" id="faNumero" class="input-form" style="width:100%; font-family:var(--font-mono);" placeholder="APOL-2026-...">
+          </div>
+          <div>
+            <label style="font-size:0.75rem; color:var(--text-muted);">Veículo da Frota:</label>
+            <select id="faPlaca" class="input-form" style="width:100%;"></select>
+          </div>
+        </div>
+        <div>
+          <label style="font-size:0.75rem; color:var(--text-muted);">Cliente / Segurado:</label>
+          <input type="text" id="faCliente" list="listaClientesApolice" class="input-form" style="width:100%;" placeholder="Nome do cliente ou locatário">
+          <datalist id="listaClientesApolice"></datalist>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+          <div>
+            <label style="font-size:0.75rem; color:var(--text-muted);">Cobertura:</label>
+            <input type="text" id="faTipo" class="input-form" style="width:100%;" value="Locação com Seguro Total + Rastreador">
+          </div>
+          <div>
+            <label style="font-size:0.75rem; color:var(--text-muted);">Seguradora:</label>
+            <input type="text" id="faSeguradora" class="input-form" style="width:100%;" value="Porto Seguro Corporativo">
+          </div>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
+          <div>
+            <label style="font-size:0.75rem; color:var(--text-muted);">Franquia (R$):</label>
+            <input type="number" min="0" step="0.01" id="faFranquia" class="input-form" style="width:100%;" value="2000">
+          </div>
+          <div>
+            <label style="font-size:0.75rem; color:var(--text-muted);">Mensalidade (R$):</label>
+            <input type="number" min="1" step="0.01" id="faValorMensal" class="input-form" style="width:100%;" value="1800">
+          </div>
+          <div>
+            <label style="font-size:0.75rem; color:var(--text-muted);">Vigência (DD/MM/AAAA):</label>
+            <input type="text" id="faVigencia" class="input-form" style="width:100%;" value="31/12/2027">
+          </div>
+        </div>
+        <button onclick="salvarApoliceModal()" class="btn-acao btn-sucesso" style="margin-top:8px; padding:12px;">
+          🛡️ Gravar Apólice no Atlas
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 7: ALTERAR PIN DE ACESSO DA FROTA -->
+  <div id="modalFrotaPin" class="modal-overlay">
+    <div class="modal-box" style="max-width:380px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <h3 style="font-size:1.05rem; font-weight:700; color:#fbbf24;">🔑 Alterar PIN de Frotas</h3>
+        <button onclick="fecharModalAlterarPin()" style="background:none; border:none; color:#ef4444; font-size:1.4rem; cursor:pointer;">✖</button>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <div>
+          <label style="font-size:0.75rem; color:var(--text-muted);">PIN Atual:</label>
+          <input type="password" id="frotaPinAtual" class="input-form" style="width:100%; font-family:var(--font-mono);" placeholder="••••">
+        </div>
+        <div>
+          <label style="font-size:0.75rem; color:var(--text-muted);">Novo PIN (mínimo 4 caracteres):</label>
+          <input type="password" id="frotaPinNovo" class="input-form" style="width:100%; font-family:var(--font-mono);" placeholder="••••">
+        </div>
+        <button onclick="salvarNovoPinFrota()" class="btn-acao btn-alerta" style="padding:11px;">
+          💾 Salvar Novo PIN
         </button>
       </div>
     </div>

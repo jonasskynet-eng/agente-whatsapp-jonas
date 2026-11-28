@@ -13,7 +13,9 @@ Recursos Ativos:
 """
 
 import hashlib
+import hmac
 import json
+import math
 import os
 import random
 import re
@@ -22,6 +24,7 @@ import unicodedata
 import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
+from functools import wraps
 from flask import Flask, request, jsonify
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
@@ -34,7 +37,7 @@ app = Flask(__name__)
 @app.after_request
 def habilitar_cors_total(response):
     response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type,Authorization,X-Requested-With"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type,Authorization,X-Requested-With,X-Frota-Token"
     response.headers["Access-Control-Allow-Methods"] = "GET,PUT,POST,DELETE,OPTIONS"
     return response
 
@@ -1431,110 +1434,690 @@ def api_crm_movimentar_saldo():
         return jsonify({"erro": str(e)}), 500
 
 
-@app.route("/api/frotas/veiculos", methods=["GET", "POST"])
-def api_frotas_veiculos():
-    """Gerencia veículos da locadora com telemetria e bloqueio remoto."""
+STATUS_VEICULO_VALIDOS = {"DISPONIVEL", "ALUGADO", "MANUTENCAO"}
+FORMAS_PAGAMENTO_VALIDAS = {"PIX", "DINHEIRO", "CARTAO_DEBITO", "CARTAO_CREDITO", "FIADO"}
+
+
+def _obter_segredo_frotas():
+    """Obtém segredo HMAC compartilhado entre processos sem senha fixa no código."""
+    seg_env = os.getenv("FROTA_AUTH_SECRET", "").strip()
+    if seg_env:
+        return seg_env
+    if config_col is not None:
+        try:
+            doc = config_col.find_one({"chave": "frota_hmac_segredo"})
+            if doc and doc.get("valor"):
+                return doc["valor"]
+            novo = hashlib.sha256(os.urandom(32)).hexdigest()
+            config_col.update_one(
+                {"chave": "frota_hmac_segredo"},
+                {"$set": {"valor": novo, "atualizado_em": agora_brasilia().strftime("%d/%m/%Y %H:%M:%S")}},
+                upsert=True
+            )
+            return novo
+        except Exception:
+            pass
+    return hashlib.sha256(URI.encode("utf-8")).hexdigest()
+
+
+def _obter_pin_hash_frotas():
+    """Retorna (hash_sha256_pin, eh_pin_padrao) lendo de variável de ambiente ou Atlas."""
+    pin_env = os.getenv("PIN_FROTAS", "").strip()
+    if pin_env:
+        return hashlib.sha256(pin_env.encode("utf-8")).hexdigest(), False
+    if config_col is not None:
+        try:
+            doc = config_col.find_one({"chave": "pin_operador_frotas"})
+            if doc and doc.get("pin_hash"):
+                return doc["pin_hash"], bool(doc.get("pin_padrao", False))
+            pin_inicial_hash = hashlib.sha256("2026".encode("utf-8")).hexdigest()
+            config_col.update_one(
+                {"chave": "pin_operador_frotas"},
+                {"$set": {"pin_hash": pin_inicial_hash, "pin_padrao": True, "atualizado_em": agora_brasilia().strftime("%d/%m/%Y %H:%M:%S")}},
+                upsert=True
+            )
+            return pin_inicial_hash, True
+        except Exception:
+            pass
+    return hashlib.sha256("2026".encode("utf-8")).hexdigest(), True
+
+
+def _gerar_token_frotas(operador="Jonas Mendonça", validade_seg=43200):
+    exp = int(time.time()) + validade_seg
+    payload = f"{exp}|{operador}"
+    segredo = _obter_segredo_frotas()
+    assinatura = hmac.new(segredo.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256).hexdigest()
+    return f"{exp}|{operador}|{assinatura}"
+
+
+def _validar_token_frotas(token):
+    if not token or not isinstance(token, str):
+        return False, None
+    partes = token.split("|")
+    if len(partes) != 3:
+        return False, None
+    exp_str, operador, assinatura = partes
     try:
+        exp = int(exp_str)
+    except ValueError:
+        return False, None
+    if exp < int(time.time()):
+        return False, None
+    segredo = _obter_segredo_frotas()
+    esperada = hmac.new(segredo.encode("utf-8"), f"{exp}|{operador}".encode("utf-8"), hashlib.sha256).hexdigest()
+    if hmac.compare_digest(assinatura, esperada):
+        return True, operador
+    return False, None
+
+
+def _extrair_token_requisicao():
+    tok = (request.headers.get("X-Frota-Token") or "").strip()
+    if tok:
+        return tok
+    auth = (request.headers.get("Authorization") or "").strip()
+    if auth.lower().startswith("bearer "):
+        return auth[7:].strip()
+    return ""
+
+
+def exigir_auth_frotas(fn):
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        if request.method == "OPTIONS":
+            return jsonify({"status": "ok"}), 200
+        ok, operador = _validar_token_frotas(_extrair_token_requisicao())
+        if not ok:
+            return jsonify({
+                "erro": "Acesso restrito ao módulo de Frotas. Informe o PIN do operador para desbloquear.",
+                "codigo": "AUTH_FROTAS_OBRIGATORIA"
+            }), 401
+        return fn(*args, **kwargs)
+    return wrapper
+
+
+def _validar_placa(placa_bruta):
+    limpa = re.sub(r"[^A-Z0-9]", "", (placa_bruta or "").strip().upper())
+    if not limpa:
+        return None, "Placa é obrigatória."
+    if not re.match(r"^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$", limpa):
+        return None, "Formato de placa inválido. Use o padrão ABC1234 ou Mercosul BRA2E19."
+    return limpa, None
+
+
+def _parse_numero(valor, nome, minimo=0.0, maximo=None, inteiro=False):
+    if valor is None or (isinstance(valor, str) and not valor.strip()):
+        return None, f"Campo '{nome}' é obrigatório."
+    try:
+        num = int(float(valor)) if inteiro else float(valor)
+    except (ValueError, TypeError):
+        return None, f"Campo '{nome}' deve ser numérico válido."
+    if not math.isfinite(num):
+        return None, f"Campo '{nome}' contém valor numérico inválido."
+    if minimo is not None and num < minimo:
+        return None, f"Campo '{nome}' não pode ser menor que {minimo}."
+    if maximo is not None and num > maximo:
+        return None, f"Campo '{nome}' não pode ser maior que {maximo}."
+    return num, None
+
+
+def _validar_data_br(data_str):
+    texto = (data_str or "").strip()
+    if not texto:
+        return None, "Data de vigência é obrigatória (DD/MM/AAAA)."
+    try:
+        datetime.strptime(texto, "%d/%m/%Y")
+        return texto, None
+    except ValueError:
+        return None, "Data inválida. Use o formato DD/MM/AAAA (ex: 31/12/2026)."
+
+
+@app.route("/api/frotas/status-pin", methods=["GET", "OPTIONS"])
+def api_frotas_status_pin():
+    if request.method == "OPTIONS":
+        return jsonify({"status": "ok"}), 200
+    _, eh_padrao = _obter_pin_hash_frotas()
+    ok, _ = _validar_token_frotas(_extrair_token_requisicao())
+    return jsonify({"autenticado": ok, "pin_padrao": eh_padrao}), 200
+
+
+@app.route("/api/frotas/autenticar", methods=["POST", "OPTIONS"])
+def api_frotas_autenticar():
+    if request.method == "OPTIONS":
+        return jsonify({"status": "ok"}), 200
+    dados = request.get_json(silent=True) or {}
+    pin = str(dados.get("pin") or "").strip()
+    if not pin:
+        return jsonify({"erro": "Informe o PIN do operador."}), 400
+    pin_hash_correto, eh_padrao = _obter_pin_hash_frotas()
+    pin_informado_hash = hashlib.sha256(pin.encode("utf-8")).hexdigest()
+    if not hmac.compare_digest(pin_informado_hash, pin_hash_correto):
+        return jsonify({"erro": "PIN incorreto."}), 401
+    token = _gerar_token_frotas("Jonas Mendonça")
+    return jsonify({"sucesso": True, "token": token, "pin_padrao": eh_padrao}), 200
+
+
+@app.route("/api/frotas/alterar-pin", methods=["POST", "OPTIONS"])
+@exigir_auth_frotas
+def api_frotas_alterar_pin():
+    if os.getenv("PIN_FROTAS", "").strip():
+        return jsonify({"erro": "O PIN está travado pela variável de ambiente PIN_FROTAS no servidor."}), 400
+    dados = request.get_json(silent=True) or {}
+    pin_atual = str(dados.get("pin_atual") or "").strip()
+    novo_pin = str(dados.get("novo_pin") or "").strip()
+    if len(novo_pin) < 4:
+        return jsonify({"erro": "O novo PIN deve ter pelo menos 4 caracteres."}), 400
+    pin_hash_correto, _ = _obter_pin_hash_frotas()
+    if not hmac.compare_digest(hashlib.sha256(pin_atual.encode("utf-8")).hexdigest(), pin_hash_correto):
+        return jsonify({"erro": "PIN atual não confere."}), 401
+    if config_col is not None:
+        novo_hash = hashlib.sha256(novo_pin.encode("utf-8")).hexdigest()
+        config_col.update_one(
+            {"chave": "pin_operador_frotas"},
+            {"$set": {"pin_hash": novo_hash, "pin_padrao": False, "atualizado_em": agora_brasilia().strftime("%d/%m/%Y %H:%M:%S")}},
+            upsert=True
+        )
+    return jsonify({"sucesso": True, "mensagem": "PIN de segurança alterado com sucesso!"}), 200
+
+
+@app.route("/api/frotas/veiculos", methods=["GET", "POST", "OPTIONS"])
+@exigir_auth_frotas
+def api_frotas_veiculos():
+    """Gerencia veículos da locadora com validação estrita e telemetria."""
+    try:
+        if col_veiculos is None:
+            return jsonify({"erro": "Banco de dados temporariamente indisponível."}), 503
+
         if request.method == "POST":
-            dados = request.json or {}
-            placa = (dados.get("placa") or "").strip().upper()
-            if not placa:
-                return jsonify({"erro": "Placa é obrigatória"}), 400
-            import random
+            dados = request.get_json(silent=True) or {}
+            placa, err = _validar_placa(dados.get("placa"))
+            if err:
+                return jsonify({"erro": err}), 400
+
+            modelo = (dados.get("modelo") or "").strip()
+            if not modelo:
+                return jsonify({"erro": "Modelo do veículo é obrigatório."}), 400
+
+            ano, err = _parse_numero(dados.get("ano", 2024), "ano", minimo=1980, maximo=2030, inteiro=True)
+            if err:
+                return jsonify({"erro": err}), 400
+
+            km, err = _parse_numero(dados.get("km", 0.0), "km", minimo=0.0)
+            if err:
+                return jsonify({"erro": err}), 400
+
+            diaria, err = _parse_numero(dados.get("diaria_valor", 150.0), "diaria_valor", minimo=0.01)
+            if err:
+                return jsonify({"erro": err}), 400
+
+            status = (dados.get("status") or "DISPONIVEL").strip().upper()
+            if status not in STATUS_VEICULO_VALIDOS:
+                return jsonify({"erro": "Status inválido. Use DISPONIVEL, ALUGADO ou MANUTENCAO."}), 400
+
+            existente = col_veiculos.find_one({"placa": placa})
+            if existente and dados.get("modo") != "editar":
+                return jsonify({"erro": f"Já existe um veículo cadastrado com a placa {placa}. Use Editar para atualizar."}), 409
+
+            gps_in = dados.get("gps") if isinstance(dados.get("gps"), dict) else {}
+            lat, err_lat = _parse_numero(gps_in.get("lat", -23.5505), "latitude", minimo=-90.0, maximo=90.0)
+            lng, err_lng = _parse_numero(gps_in.get("lng", -46.6333), "longitude", minimo=-180.0, maximo=180.0)
+            if err_lat or err_lng:
+                return jsonify({"erro": err_lat or err_lng}), 400
+
             doc = {
                 "placa": placa,
-                "modelo": dados.get("modelo", "").strip(),
-                "ano": int(dados.get("ano", 2024)),
-                "categoria": dados.get("categoria", "Passeio"),
-                "km": float(dados.get("km", 0.0)),
-                "status": dados.get("status", "DISPONIVEL"),
-                "diaria_valor": float(dados.get("diaria_valor", 150.0)),
-                "ignicao": bool(dados.get("ignicao", False)),
-                "bloqueado": bool(dados.get("bloqueado", False)),
-                "rastreador_id": dados.get("rastreador_id", f"SAT-{random.randint(1000, 9999)}"),
-                "gps": dados.get("gps", {
-                    "lat": -23.5505,
-                    "lng": -46.6333,
-                    "endereco": "São Paulo - SP (Pátio Central)"
-                }),
+                "modelo": modelo,
+                "ano": ano,
+                "categoria": (dados.get("categoria") or "Passeio").strip() or "Passeio",
+                "km": round(km, 1),
+                "status": status,
+                "diaria_valor": round(diaria, 2),
+                "ignicao": bool(existente.get("ignicao", False)) if existente else bool(dados.get("ignicao", False)),
+                "bloqueado": bool(existente.get("bloqueado", False)) if existente else bool(dados.get("bloqueado", False)),
+                "rastreador_id": (dados.get("rastreador_id") or (existente.get("rastreador_id") if existente else f"SAT-{random.randint(1000, 9999)}")).strip().upper(),
+                "gps": {
+                    "lat": lat,
+                    "lng": lng,
+                    "endereco": (gps_in.get("endereco") or "São Paulo - SP (Pátio Central)").strip()
+                },
                 "atualizado_em": agora_brasilia().strftime("%d/%m/%Y %H:%M:%S")
             }
-            if col_veiculos is not None:
-                col_veiculos.update_one({"placa": placa}, {"$set": doc}, upsert=True)
+            col_veiculos.update_one({"placa": placa}, {"$set": doc}, upsert=True)
             return jsonify({"sucesso": True, "veiculo": doc}), 201
 
-        veiculos = list(col_veiculos.find({}, {"_id": 0})) if col_veiculos is not None else []
+        veiculos = list(col_veiculos.find({}, {"_id": 0}))
         return jsonify(veiculos), 200
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
 
 
-@app.route("/api/frotas/bloqueio", methods=["POST"])
-def api_frotas_comando_bloqueio():
-    """Envia comando satelital de corte de ignição ou liberação de veículo."""
+@app.route("/api/frotas/veiculos/<placa>", methods=["PUT", "DELETE", "OPTIONS"])
+@exigir_auth_frotas
+def api_frotas_veiculo_unico(placa):
+    """Atualiza ou exclui um veículo específico pela placa."""
     try:
-        dados = request.json or {}
-        placa = (dados.get("placa") or "").strip().upper()
-        if not placa:
+        if col_veiculos is None:
+            return jsonify({"erro": "Banco de dados temporariamente indisponível."}), 503
+        placa_limpa, err = _validar_placa(placa)
+        if err:
+            return jsonify({"erro": err}), 400
+
+        veiculo = col_veiculos.find_one({"placa": placa_limpa})
+        if not veiculo:
+            return jsonify({"erro": "Veículo não encontrado."}), 404
+
+        if request.method == "DELETE":
+            if veiculo.get("status") == "ALUGADO":
+                return jsonify({"erro": "Não é possível excluir um veículo em locação ativa. Registre a devolução antes."}), 400
+            col_veiculos.delete_one({"placa": placa_limpa})
+            return jsonify({"sucesso": True, "mensagem": f"Veículo {placa_limpa} removido da frota."}), 200
+
+        dados = request.get_json(silent=True) or {}
+        atualizacoes = {"atualizado_em": agora_brasilia().strftime("%d/%m/%Y %H:%M:%S")}
+
+        if "modelo" in dados:
+            modelo = (dados.get("modelo") or "").strip()
+            if not modelo:
+                return jsonify({"erro": "Modelo não pode ficar vazio."}), 400
+            atualizacoes["modelo"] = modelo
+        if "ano" in dados:
+            ano, err = _parse_numero(dados.get("ano"), "ano", minimo=1980, maximo=2030, inteiro=True)
+            if err:
+                return jsonify({"erro": err}), 400
+            atualizacoes["ano"] = ano
+        if "categoria" in dados:
+            atualizacoes["categoria"] = (dados.get("categoria") or "Passeio").strip() or "Passeio"
+        if "km" in dados:
+            km, err = _parse_numero(dados.get("km"), "km", minimo=0.0)
+            if err:
+                return jsonify({"erro": err}), 400
+            atualizacoes["km"] = round(km, 1)
+        if "diaria_valor" in dados:
+            diaria, err = _parse_numero(dados.get("diaria_valor"), "diaria_valor", minimo=0.01)
+            if err:
+                return jsonify({"erro": err}), 400
+            atualizacoes["diaria_valor"] = round(diaria, 2)
+        if "rastreador_id" in dados:
+            atualizacoes["rastreador_id"] = (dados.get("rastreador_id") or "").strip().upper()
+        if "status" in dados:
+            st = (dados.get("status") or "").strip().upper()
+            if st not in STATUS_VEICULO_VALIDOS:
+                return jsonify({"erro": "Status inválido. Use DISPONIVEL, ALUGADO ou MANUTENCAO."}), 400
+            if veiculo.get("locacao_atual") and st != "ALUGADO":
+                return jsonify({"erro": "Veículo possui locação ativa. Use o botão Devolver para encerrar a locação."}), 400
+            atualizacoes["status"] = st
+        if isinstance(dados.get("gps"), dict):
+            gps_in = dados["gps"]
+            lat, err_lat = _parse_numero(gps_in.get("lat", veiculo.get("gps", {}).get("lat", -23.5505)), "latitude", minimo=-90.0, maximo=90.0)
+            lng, err_lng = _parse_numero(gps_in.get("lng", veiculo.get("gps", {}).get("lng", -46.6333)), "longitude", minimo=-180.0, maximo=180.0)
+            if err_lat or err_lng:
+                return jsonify({"erro": err_lat or err_lng}), 400
+            atualizacoes["gps"] = {
+                "lat": lat,
+                "lng": lng,
+                "endereco": (gps_in.get("endereco") or veiculo.get("gps", {}).get("endereco", "São Paulo - SP")).strip()
+            }
+
+        col_veiculos.update_one({"placa": placa_limpa}, {"$set": atualizacoes})
+        veiculo_atualizado = col_veiculos.find_one({"placa": placa_limpa}, {"_id": 0})
+        return jsonify({"sucesso": True, "veiculo": veiculo_atualizado}), 200
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
+
+@app.route("/api/frotas/bloqueio", methods=["POST", "OPTIONS"])
+@exigir_auth_frotas
+def api_frotas_comando_bloqueio():
+    """Envia comando simulado de bloqueio ou liberação sem ligar o motor sozinho."""
+    try:
+        if col_veiculos is None:
+            return jsonify({"erro": "Banco de dados temporariamente indisponível."}), 503
+        dados = request.get_json(silent=True) or {}
+        placa_bruta = (dados.get("placa") or "").strip().upper()
+        if not placa_bruta:
             return jsonify({"erro": "Placa não informada"}), 400
-        
-        veiculo = col_veiculos.find_one({"placa": placa}) if col_veiculos is not None else None
+        placa = re.sub(r"[^A-Z0-9]", "", placa_bruta)
+
+        veiculo = col_veiculos.find_one({"placa": placa})
         if not veiculo:
             return jsonify({"erro": "Veículo não encontrado"}), 404
-        
-        novo_status_bloqueio = not veiculo.get("bloqueado", False)
-        nova_ignicao = False if novo_status_bloqueio else True
-        
+
+        novo_status_bloqueio = not bool(veiculo.get("bloqueado", False))
+        # Bloquear corta ignição; desbloquear apenas libera a partida sem ligar o motor
+        nova_ignicao = False if novo_status_bloqueio else bool(veiculo.get("ignicao", False))
+
+        _, operador = _validar_token_frotas(_extrair_token_requisicao())
+        comando_reg = {
+            "tipo": "BLOQUEIO_REMOTO" if novo_status_bloqueio else "DESBLOQUEIO_REMOTO",
+            "data_hora": agora_brasilia().strftime("%d/%m/%Y %H:%M:%S"),
+            "operador": operador or "Jonas Mendonça",
+            "status_telemetria": "COMANDO_REGISTRADO_SIMULADO"
+        }
+
         col_veiculos.update_one(
             {"placa": placa},
-            {"$set": {
-                "bloqueado": novo_status_bloqueio,
-                "ignicao": nova_ignicao,
-                "ultimo_comando": {
-                    "tipo": "BLOQUEIO_REMOTO" if novo_status_bloqueio else "DESBLOQUEIO_REMOTO",
-                    "data_hora": agora_brasilia().strftime("%d/%m/%Y %H:%M:%S"),
-                    "operador": "Jonas Mendonça",
-                    "status_telemetria": "COMANDO_ENTREGUE_VIA_SATELITE"
+            {
+                "$set": {
+                    "bloqueado": novo_status_bloqueio,
+                    "ignicao": nova_ignicao,
+                    "ultimo_comando": comando_reg,
+                    "atualizado_em": comando_reg["data_hora"]
+                },
+                "$push": {
+                    "historico_comandos": {"$each": [comando_reg], "$slice": -10}
                 }
-            }}
+            }
+        )
+        msg_acao = (
+            "BLOQUEADO (Ignição cortada no registro)"
+            if novo_status_bloqueio
+            else "DESBLOQUEADO (Partida liberada; ignição mantida desligada até uso da chave)"
         )
         return jsonify({
             "sucesso": True,
             "placa": placa,
             "bloqueado": novo_status_bloqueio,
             "ignicao": nova_ignicao,
-            "mensagem": f"Sinal de satélite transmitido! Veículo {placa} {'BLOQUEADO (Ignição Cortada)' if novo_status_bloqueio else 'DESBLOQUEADO (Liberado)'} com sucesso!"
+            "ultimo_comando": comando_reg,
+            "mensagem": f"Comando registrado! Veículo {placa} {msg_acao}."
         }), 200
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
 
 
-@app.route("/api/seguros/apolices", methods=["GET", "POST"])
-def api_seguros_apolices():
-    """Gerencia contratos de locação e apólices de seguro veicular."""
+@app.route("/api/frotas/locacao", methods=["POST", "OPTIONS"])
+@exigir_auth_frotas
+def api_frotas_locacao():
+    """Registra aluguel ou devolução de veículo integrando caixa (PDV) e CRM (Fiado)."""
     try:
+        if col_veiculos is None:
+            return jsonify({"erro": "Banco de dados temporariamente indisponível."}), 503
+        dados = request.get_json(silent=True) or {}
+        acao = (dados.get("acao") or "").strip().lower()
+        placa, err = _validar_placa(dados.get("placa"))
+        if err:
+            return jsonify({"erro": err}), 400
+
+        veiculo = col_veiculos.find_one({"placa": placa})
+        if not veiculo:
+            return jsonify({"erro": "Veículo não encontrado."}), 404
+
+        agora_str = agora_brasilia().strftime("%d/%m/%Y %H:%M:%S")
+
+        if acao == "alugar":
+            if veiculo.get("status") != "DISPONIVEL":
+                return jsonify({"erro": f"Veículo {placa} não está disponível (status atual: {veiculo.get('status')})."}), 400
+            if veiculo.get("bloqueado"):
+                return jsonify({"erro": f"Veículo {placa} está bloqueado. Desbloqueie antes de liberar a locação."}), 400
+
+            dias, err = _parse_numero(dados.get("dias", 1), "dias", minimo=1, maximo=365, inteiro=True)
+            if err:
+                return jsonify({"erro": err}), 400
+
+            desconto, err = _parse_numero(dados.get("desconto_valor", 0.0), "desconto_valor", minimo=0.0)
+            if err:
+                return jsonify({"erro": err}), 400
+
+            cliente_nome = (dados.get("cliente_nome") or "").strip()
+            cliente_cpf = (dados.get("cliente_cpf") or "").strip()
+            if not cliente_nome and cliente_cpf and col_clientes is not None:
+                cli = col_clientes.find_one({"cpf_cnpj": cliente_cpf})
+                if cli:
+                    cliente_nome = cli.get("nome", "")
+            if not cliente_nome:
+                return jsonify({"erro": "Informe ou selecione o cliente da locação."}), 400
+
+            forma_pgto = (dados.get("forma_pagamento") or "PIX").strip().upper()
+            if forma_pgto not in FORMAS_PAGAMENTO_VALIDAS:
+                return jsonify({"erro": "Forma de pagamento inválida."}), 400
+
+            diaria = float(veiculo.get("diaria_valor") or 150.0)
+            subtotal = round(dias * diaria, 2)
+            if desconto > subtotal:
+                return jsonify({"erro": "Desconto não pode ser maior que o subtotal da locação."}), 400
+            total_liquido = round(subtotal - desconto, 2)
+
+            if forma_pgto == "FIADO":
+                if not cliente_cpf or col_clientes is None:
+                    return jsonify({"erro": "Selecione um cliente cadastrado com CPF/CNPJ para lançar locação no Fiado."}), 400
+                cli_doc = col_clientes.find_one({"cpf_cnpj": cliente_cpf})
+                if not cli_doc:
+                    return jsonify({"erro": "Cliente não encontrado no CRM para crédito Fiado."}), 404
+                limite = float(cli_doc.get("limite_credito") or 0.0)
+                saldo_atual = float(cli_doc.get("saldo_devedor") or 0.0)
+                if saldo_atual + total_liquido > limite:
+                    return jsonify({"erro": f"Limite de crédito insuficiente no CRM (Disponível: R$ {max(0.0, limite - saldo_atual):.2f})."}), 400
+                col_clientes.update_one({"cpf_cnpj": cliente_cpf}, {"$inc": {"saldo_devedor": total_liquido}})
+
+            cod_venda = f"LOC-{int(time.time())}"
+            doc_venda = {
+                "codigo_venda": cod_venda,
+                "data_hora": agora_str,
+                "cliente_nome": cliente_nome,
+                "cliente_cpf": cliente_cpf,
+                "subtotal_bruto": subtotal,
+                "desconto_valor": desconto,
+                "total_liquido": total_liquido,
+                "forma_pagamento": forma_pgto,
+                "valor_pago": total_liquido,
+                "troco": 0.0,
+                "origem": "LOCADORA_FROTAS",
+                "itens": [{
+                    "codigo_barras": f"LOC-{placa}",
+                    "nome": f"Locação {veiculo.get('modelo')} ({placa}) - {dias} dia(s)",
+                    "quantidade": dias,
+                    "preco_unitario": diaria,
+                    "subtotal": subtotal
+                }],
+                "status": "CONCLUIDA"
+            }
+            if col_vendas is not None:
+                col_vendas.insert_one(doc_venda)
+
+            data_prevista = (dados.get("data_prevista_retorno") or "").strip() or (agora_brasilia() + timedelta(days=dias)).strftime("%d/%m/%Y")
+            locacao_info = {
+                "codigo_locacao": cod_venda,
+                "cliente_nome": cliente_nome,
+                "cliente_cpf": cliente_cpf,
+                "dias_contratados": dias,
+                "diaria_valor": diaria,
+                "total_contratado": total_liquido,
+                "forma_pagamento": forma_pgto,
+                "km_saida": float(veiculo.get("km") or 0.0),
+                "data_saida": agora_str,
+                "data_prevista_retorno": data_prevista,
+                "observacoes": (dados.get("observacoes") or "").strip()
+            }
+            col_veiculos.update_one(
+                {"placa": placa},
+                {"$set": {"status": "ALUGADO", "locacao_atual": locacao_info, "atualizado_em": agora_str}}
+            )
+
+            registrar_evento_email(
+                "LOCACAO_FROTA", cliente_nome, f"({cliente_cpf or 'S/Doc'})", total_liquido,
+                f"Locação {placa} ({dias}d) - #{cod_venda}",
+                f"Veículo {veiculo.get('modelo')} alugado via {forma_pgto}"
+            )
+            return jsonify({
+                "sucesso": True,
+                "mensagem": f"Locação #{cod_venda} iniciada para {cliente_nome}! Valor de R$ {total_liquido:.2f} lançado no Caixa/PDV.",
+                "locacao": locacao_info
+            }), 201
+
+        if acao == "devolver":
+            if veiculo.get("status") != "ALUGADO":
+                return jsonify({"erro": f"Veículo {placa} não está marcado como ALUGADO."}), 400
+
+            km_atual = float(veiculo.get("km") or 0.0)
+            km_final, err = _parse_numero(dados.get("km_final", km_atual), "km_final", minimo=km_atual)
+            if err:
+                return jsonify({"erro": err}), 400
+
+            diarias_extras, err = _parse_numero(dados.get("diarias_extras", 0), "diarias_extras", minimo=0, maximo=180, inteiro=True)
+            if err:
+                return jsonify({"erro": err}), 400
+
+            taxa_extra, err = _parse_numero(dados.get("taxa_extra", 0.0), "taxa_extra", minimo=0.0)
+            if err:
+                return jsonify({"erro": err}), 400
+
+            diaria = float(veiculo.get("diaria_valor") or 150.0)
+            valor_extras = round((diarias_extras * diaria) + taxa_extra, 2)
+            loc_atual = veiculo.get("locacao_atual") or {}
+            cliente_nome = loc_atual.get("cliente_nome") or "Locatário"
+            cliente_cpf = loc_atual.get("cliente_cpf") or ""
+
+            cod_extra = None
+            if valor_extras > 0:
+                forma_extra = (dados.get("forma_pagamento_extra") or "PIX").strip().upper()
+                if forma_extra not in FORMAS_PAGAMENTO_VALIDAS:
+                    return jsonify({"erro": "Forma de pagamento do acerto extra inválida."}), 400
+                if forma_extra == "FIADO":
+                    if not cliente_cpf or col_clientes is None:
+                        return jsonify({"erro": "Sem CPF/CNPJ vinculado na locação para lançar acerto extra no Fiado."}), 400
+                    cli_doc = col_clientes.find_one({"cpf_cnpj": cliente_cpf})
+                    if not cli_doc:
+                        return jsonify({"erro": "Cliente não localizado no CRM."}), 404
+                    limite = float(cli_doc.get("limite_credito") or 0.0)
+                    saldo_atual = float(cli_doc.get("saldo_devedor") or 0.0)
+                    if saldo_atual + valor_extras > limite:
+                        return jsonify({"erro": f"Limite no CRM excedido para acerto extra (Disponível: R$ {max(0.0, limite - saldo_atual):.2f})."}), 400
+                    col_clientes.update_one({"cpf_cnpj": cliente_cpf}, {"$inc": {"saldo_devedor": valor_extras}})
+
+                cod_extra = f"DEV-{int(time.time())}"
+                itens_extra = []
+                if diarias_extras > 0:
+                    itens_extra.append({
+                        "codigo_barras": f"EXT-{placa}",
+                        "nome": f"Diária(s) Extra(s) {placa} ({diarias_extras}d)",
+                        "quantidade": diarias_extras,
+                        "preco_unitario": diaria,
+                        "subtotal": round(diarias_extras * diaria, 2)
+                    })
+                if taxa_extra > 0:
+                    itens_extra.append({
+                        "codigo_barras": f"TAX-{placa}",
+                        "nome": f"Combustível / Taxa Devolução ({placa})",
+                        "quantidade": 1,
+                        "preco_unitario": taxa_extra,
+                        "subtotal": round(taxa_extra, 2)
+                    })
+                if col_vendas is not None:
+                    col_vendas.insert_one({
+                        "codigo_venda": cod_extra,
+                        "data_hora": agora_str,
+                        "cliente_nome": cliente_nome,
+                        "cliente_cpf": cliente_cpf,
+                        "subtotal_bruto": valor_extras,
+                        "desconto_valor": 0.0,
+                        "total_liquido": valor_extras,
+                        "forma_pagamento": forma_extra,
+                        "valor_pago": valor_extras,
+                        "troco": 0.0,
+                        "origem": "LOCADORA_DEVOLUCAO",
+                        "itens": itens_extra,
+                        "status": "CONCLUIDA"
+                    })
+
+            km_rodado = round(km_final - km_atual, 1)
+            col_veiculos.update_one(
+                {"placa": placa},
+                {
+                    "$set": {
+                        "status": "DISPONIVEL",
+                        "km": round(km_final, 1),
+                        "atualizado_em": agora_str,
+                        "ultima_devolucao": {
+                            "data_hora": agora_str,
+                            "cliente_nome": cliente_nome,
+                            "km_rodado": km_rodado,
+                            "valor_extras": valor_extras,
+                            "codigo_acerto": cod_extra
+                        }
+                    },
+                    "$unset": {"locacao_atual": ""}
+                }
+            )
+            return jsonify({
+                "sucesso": True,
+                "km_rodado": km_rodado,
+                "valor_extras": valor_extras,
+                "mensagem": f"Veículo {placa} devolvido ao pátio (+{km_rodado:.0f} km)." + (f" Acerto extra de R$ {valor_extras:.2f} lançado no Caixa." if valor_extras > 0 else "")
+            }), 200
+
+        return jsonify({"erro": "Ação inválida. Use 'alugar' ou 'devolver'."}), 400
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
+
+@app.route("/api/seguros/apolices", methods=["GET", "POST", "OPTIONS"])
+@exigir_auth_frotas
+def api_seguros_apolices():
+    """Gerencia contratos de locação e apólices de seguro veicular com validação completa."""
+    try:
+        if col_apolices is None:
+            return jsonify({"erro": "Banco de dados temporariamente indisponível."}), 503
+
         if request.method == "POST":
-            dados = request.json or {}
-            import random
-            num = dados.get("numero_apolice") or f"APOL-{random.randint(1000, 9999)}"
+            dados = request.get_json(silent=True) or {}
+            placa, err = _validar_placa(dados.get("veiculo_placa"))
+            if err:
+                return jsonify({"erro": err}), 400
+
+            if col_veiculos is not None and not col_veiculos.find_one({"placa": placa}):
+                return jsonify({"erro": f"Veículo {placa} não encontrado na frota. Cadastre o carro primeiro."}), 404
+
+            cliente_nome = (dados.get("cliente_nome") or "").strip()
+            if not cliente_nome:
+                return jsonify({"erro": "Nome do cliente segurado/locatário é obrigatório."}), 400
+
+            franquia, err = _parse_numero(dados.get("franquia", 2000.0), "franquia", minimo=0.0)
+            if err:
+                return jsonify({"erro": err}), 400
+
+            valor_mensal, err = _parse_numero(dados.get("valor_mensal"), "valor_mensal", minimo=0.01)
+            if err:
+                return jsonify({"erro": err}), 400
+
+            vigencia_fim, err = _validar_data_br(dados.get("vigencia_fim"))
+            if err:
+                return jsonify({"erro": err}), 400
+
+            num = re.sub(r"\s+", "", (dados.get("numero_apolice") or "").strip().upper()) or f"APOL-{agora_brasilia().strftime('%Y')}-{random.randint(1000, 9999)}"
+            if col_apolices.find_one({"numero_apolice": num}) and dados.get("modo") != "editar":
+                return jsonify({"erro": f"Já existe uma apólice com o número {num}."}), 409
+
             doc = {
                 "numero_apolice": num,
-                "veiculo_placa": dados.get("veiculo_placa", "").strip().upper(),
-                "cliente_nome": dados.get("cliente_nome", "").strip(),
-                "tipo": dados.get("tipo", "Locação com Seguro Total"),
-                "franquia": float(dados.get("franquia", 2000.0)),
-                "valor_mensal": float(dados.get("valor_mensal", 1500.0)),
-                "vigencia_fim": dados.get("vigencia_fim", "31/12/2026"),
-                "seguradora": dados.get("seguradora", "Porto Seguro Corporativo"),
-                "status": dados.get("status", "ATIVA"),
+                "veiculo_placa": placa,
+                "cliente_nome": cliente_nome,
+                "tipo": (dados.get("tipo") or "Locação com Seguro Total").strip(),
+                "franquia": round(franquia, 2),
+                "valor_mensal": round(valor_mensal, 2),
+                "vigencia_fim": vigencia_fim,
+                "seguradora": (dados.get("seguradora") or "Porto Seguro Corporativo").strip(),
+                "status": (dados.get("status") or "ATIVA").strip().upper(),
                 "cadastrado_em": agora_brasilia().strftime("%d/%m/%Y %H:%M:%S")
             }
-            if col_apolices is not None:
-                col_apolices.update_one({"numero_apolice": num}, {"$set": doc}, upsert=True)
+            col_apolices.update_one({"numero_apolice": num}, {"$set": doc}, upsert=True)
             return jsonify({"sucesso": True, "apolice": doc}), 201
 
-        apolices = list(col_apolices.find({}, {"_id": 0})) if col_apolices is not None else []
+        apolices = list(col_apolices.find({}, {"_id": 0}))
         return jsonify(apolices), 200
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
+
+@app.route("/api/seguros/apolices/<numero>", methods=["DELETE", "OPTIONS"])
+@exigir_auth_frotas
+def api_seguros_deletar_apolice(numero):
+    try:
+        if col_apolices is None:
+            return jsonify({"erro": "Banco de dados temporariamente indisponível."}), 503
+        num_limpo = (numero or "").strip().upper()
+        res = col_apolices.delete_one({"numero_apolice": num_limpo})
+        if res.deleted_count == 0:
+            return jsonify({"erro": "Apólice não encontrada."}), 404
+        return jsonify({"sucesso": True, "mensagem": f"Apólice {num_limpo} removida."}), 200
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
 
