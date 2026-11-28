@@ -124,9 +124,9 @@ def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tip
     if any(cmd in texto for cmd in ["menu", "voltar", "inicio", "início", "opcoes", "opções", "sair"]):
         setor_atual = "MENU_INICIAL"
 
-    # 4. ROTEAMENTO DINÂMICO
+    # 4. ROTEAMENTO DINÂMICO INTELIGENTE (POR NÚMERO OU POR INTENÇÃO NATURAL)
     if setor_atual == "MENU_INICIAL":
-        if texto in ["1", "tv", "iptv", "cinepro", "teste", "futebol", "canais"]:
+        if any(p in texto for p in ["1", "tv", "iptv", "cinepro", "teste", "futebol", "canais", "filme", "série", "serie"]):
             novo_setor = "SETOR_1_CINEPRO"
             atendente = "Camila • Especialista CinePro TV"
             agora = datetime.now()
@@ -142,7 +142,7 @@ def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tip
                 f"⏰ Daqui a 15 minutinhos vou te mandar uma mensagem rápida para confirmar se a imagem abriu perfeita aí pra você!\n\n"
                 f"_(Para voltar ao menu geral a qualquer momento, basta digitar *MENU*)_"
             )
-        elif texto in ["2", "suporte", "tecnico", "técnico", "defeito", "erro", "formatar", "pc lento", "windows"]:
+        elif any(p in texto for p in ["2", "suporte", "tecnico", "técnico", "defeito", "erro", "formatar", "pc lento", "windows", "ajuda", "conserto", "travando"]):
             novo_setor = "SETOR_2_SUPORTE"
             atendente = "Lucas • Suporte Técnico Jonas Tech"
             resposta = (
@@ -154,7 +154,7 @@ def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tip
                 f"Me conte em detalhes o que está acontecendo para eu te orientar agora mesmo.\n\n"
                 f"_(Para trocar de setor, digite *MENU*)_"
             )
-        elif texto in ["3", "vendas", "comercial", "comprar", "preco", "preço", "sistema pdv", "pix", "150"]:
+        elif any(p in texto for p in ["3", "venda", "comercial", "comprar", "preco", "preço", "sistema pdv", "pix", "150", "quanto custa", "valor", "tabela"]):
             novo_setor = "SETOR_3_COMERCIAL"
             atendente = "Marcos • Consultor Comercial"
             resposta = (
@@ -170,7 +170,7 @@ def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tip
                 f"Qual dessas soluções você deseja implantar hoje? Me avise para eu gerar o seu acesso!\n\n"
                 f"_(Para voltar às opções, digite *MENU*)_"
             )
-        elif texto in ["4", "jonas", "humano", "pessoa", "atendente", "falar com jonas"]:
+        elif any(p in texto for p in ["4", "jonas", "humano", "pessoa", "atendente", "falar com jonas"]):
             novo_setor = "SETOR_4_JONAS_HUMANO"
             atendente = "Jonas Mendonça (Fundador)"
             disparar_alerta_cliente_quente(telefone, nome, "CLIENTE SOLICITOU ATENDIMENTO HUMANO COM O JONAS")
