@@ -1,14 +1,14 @@
 """
 ================================================================================
-AGENTE DE WHATSAPP NA NUVEM - CENTRAL RESOLUTIVA 24/7 (VERSÃO 4.0)
+AGENTE DE WHATSAPP NA NUVEM - CENTRAL HUMANA & RELATÓRIOS 24/7 (VERSÃO 5.0)
 Jonas Tech Solutions • Conectado ao MongoDB Atlas (Cluster0 AWS São Paulo)
 ================================================================================
-Agentes 100% resolutivos:
-1. Camila (CinePro TV): PIX blindado, leitura OCR/PDF, gera usuário/senha 30 dias e notifica o Jonas
-2. Lucas (Suporte TI): Diagnóstico real de rede, canais, tela preta 0:00, Smart TV, Windows e PDV
-3. Marcos (Comercial): Consultoria de melhorias, combos de economia e PIX blindado
-4. Endpoint /api/cinepro/login para desbloqueio real do player CinePro TV
-5. Controle mestre (LIGAR, DESLIGAR e #liberar) direto pelo WhatsApp
+Recursos Ativos:
+1. Linguagem 100% humana, natural e fluida (sem cara de robô ou URA)
+2. Camila (CinePro TV): PIX blindado, OCR/PDF, login 30 dias e aviso ao Jonas
+3. Lucas (Suporte TI): Diagnóstico real + registro técnico para e-mail
+4. Marcos (Comercial): Consultoria de melhorias, combos e PIX blindado
+5. Coleção eventos_relatorio_email + /api/relatorio-email (acumulado do dia)
 ================================================================================
 """
 
@@ -59,6 +59,8 @@ try:
     config_col = db["configuracoes_gerais"]
     assinantes_col = db["assinantes_cinepro"]
     comprovantes_col = db["comprovantes_validados"]
+    eventos_email_col = db["eventos_relatorio_email"]
+    vendas_pdv_col = db["historico_vendas"]
     print("[NUVEM] Conexão com MongoDB Atlas validada com sucesso!")
 except Exception as e:
     print(f"[ERRO MONGODB NUVEM] {e}")
@@ -67,6 +69,8 @@ except Exception as e:
     config_col = None
     assinantes_col = None
     comprovantes_col = None
+    eventos_email_col = None
+    vendas_pdv_col = None
 
 
 def agora_brasilia():
@@ -142,6 +146,28 @@ def disparar_alerta_cliente_quente(telefone, nome, motivo, valor=None):
             })
         except Exception as e:
             print(f"[ERRO ALERTA]: {e}")
+
+
+def registrar_evento_email(tipo, cliente, telefone, valor=0.0, descricao="", suporte_feito=""):
+    """Registra pagamentos e atendimentos técnicos para consolidar no relatório por e-mail."""
+    if eventos_email_col is None:
+        return
+    try:
+        agora = agora_brasilia()
+        eventos_email_col.insert_one({
+            "id_evento": f"EVT-{int(datetime.utcnow().timestamp() * 1000)}-{random.randint(100, 999)}",
+            "tipo": tipo,
+            "data_dia": agora.strftime("%Y-%m-%d"),
+            "horario": agora.strftime("%H:%M:%S"),
+            "cliente": cliente or "Cliente",
+            "telefone": str(telefone),
+            "valor": float(valor or 0.0),
+            "descricao": (descricao or "")[:300],
+            "suporte_feito": (suporte_feito or "")[:350],
+            "enviado_email": False
+        })
+    except Exception as e:
+        print(f"[ERRO EVENTO EMAIL]: {e}")
 
 
 def gerar_credenciais_cinepro(telefone, nome, valor_pago=30.0, resumo_comprovante=""):
@@ -244,11 +270,11 @@ def montar_bloco_pix(pnome, valor_formatado):
     """Monta 3 balões com a chave PIX separada e blindagem bancária sem termos proibidos."""
     virgula_nome = f", {pnome}" if pnome else ""
     return [
-        f"Fechou{virgula_nome}! Fica *{valor_formatado}*. Vou te mandar a chave PIX separada aqui embaixo pra você só copiar e colar:",
+        f"Fechado{virgula_nome}! Fica {valor_formatado}. Vou te mandar a chave PIX separada aqui embaixo pra ficar fácil de você copiar:",
         f"{CHAVE_PIX_OFICIAL}",
         (
-            f"Quando você colar a chave no seu banco, vai aparecer exatamente o nome do nosso titular responsável: *{TITULAR_CONTA}* ({BANCO_RECEBEDOR}) — é esse nome mesmo que aparece pra você confirmar com total segurança, viu?\n\n"
-            "⚠️ *Só um cuidado importante:* na descrição/mensagem do PIX, *deixe em branco* (não escreva nada sobre o serviço). Assim que concluir, me manda a foto ou PDF do comprovante aqui mesmo!"
+            f"Quando você colar a chave no seu banco, vai aparecer exatamente o nome do nosso responsável, {TITULAR_CONTA} ({BANCO_RECEBEDOR}) — é esse nome mesmo que aparece pra você confirmar tranquilo e sem receio, viu? "
+            "Só deixa a descrição do PIX em branco por favor, sem escrever nada sobre o serviço. Assim que concluir me manda o comprovante por aqui!"
         )
     ]
 
@@ -262,13 +288,13 @@ def obter_recepcao_natural(pnome):
     ])
     corpo = (
         "Aqui é da equipe do Jonas! Me conta, como posso te ajudar hoje? "
-        "Você tá procurando o teste grátis da TV, nosso sistema de caixa e estoque ou precisa de suporte pro computador?"
+        "Você tá procurando o teste grátis da TV, nosso sistema de caixa e estoque ou precisa de ajuda técnica pro computador?"
     )
     return [abertura, corpo]
 
 
 def diagnosticar_suporte_lucas(pnome, nome, telefone, mensagem, tipo_midia, texto_comprovante):
-    """Retorna (baloes, notificacao_jonas) para o Lucas resolver problemas reais de rede, canais e sistemas."""
+    """Retorna (baloes, notificacao_jonas) para o Lucas resolver problemas reais e registrar no relatório."""
     virgula_nome = f", {pnome}" if pnome else ""
     texto = (mensagem or "").strip().lower()
     notificacao = None
@@ -280,6 +306,11 @@ def diagnosticar_suporte_lucas(pnome, nome, telefone, mensagem, tipo_midia, text
             f"👤 {nome} ({telefone})\n"
             f"🖥️ Texto lido na tela: {texto_tela[:180] or 'sem texto legível'}"
         )
+        registrar_evento_email(
+            "SUPORTE_TECNICO", nome, telefone, 0.0,
+            f"Foto de erro enviada: {texto_tela[:160] or 'imagem sem texto'}",
+            "Leitura da tela realizada pelo Lucas e encaminhada para correção na bancada."
+        )
         baloes = [
             f"Boa{virgula_nome}, recebi a foto da sua tela aqui e já li os detalhes do aviso!",
             "Já organizei o diagnóstico aqui na bancada e passei no celular do Jonas pra gente te dar a correção certeira por aqui mesmo em instantes!"
@@ -287,43 +318,64 @@ def diagnosticar_suporte_lucas(pnome, nome, telefone, mensagem, tipo_midia, text
         return baloes, notificacao
 
     if any(p in texto for p in ["travando", "engasgando", "oscilando", "carregando", "bolinha", "internet", "rede", "wifi", "wi-fi", "lenta", "rota", "dns"]):
+        registrar_evento_email(
+            "SUPORTE_TECNICO", nome, telefone, 0.0,
+            mensagem[:180],
+            "Orientação de troca para Wi-Fi 5G / cabo e reinício de 30s no roteador para renovar DNS."
+        )
         baloes = [
             f"Vamos resolver essa oscilação agora{virgula_nome}! Aqui é o Lucas, do suporte.",
-            (
-                "90% das vezes que dá essas engasgadas à noite é rota congestionada da operadora ou interferência no Wi-Fi 2.4GHz. Faz esse teste rápido comigo:\n"
-                "1️⃣ Se sua internet tiver duas redes Wi-Fi, conecta na rede *5G* (ou cabo de rede na TV);\n"
-                "2️⃣ Tira o roteador da tomada por 30 segundos e liga de novo pra renovar o DNS."
-            ),
-            "Me fala também: tá travando em todos os canais ou em um canal específico? E você tá assistindo na Smart TV, TV Box ou celular?"
+            "Quase sempre que dá essas engasgadas à noite é rota congestionada da operadora ou interferência no Wi-Fi comum. Tenta conectar na rede 5G do seu roteador (ou cabo na TV) e tira o roteador da tomada por uns 30 segundos pra renovar o DNS.",
+            "Me fala também: tá travando em todos os canais ou em um específico? E você tá assistindo na Smart TV, TV Box ou celular?"
         ]
         return baloes, notificacao
 
     if any(p in texto for p in ["canal", "canais", "fora do ar", "sem som", "mudo", "tela preta", "não abre", "nao abre", "0:00", "sumiu", "sinal"]):
         notificacao = f"🛠️ *CHAMADO DE CANAL/SINAL (LUCAS):*\n👤 {nome} ({telefone})\n💬 Relato: {(mensagem or '')[:160]}"
+        registrar_evento_email(
+            "SUPORTE_TECNICO", nome, telefone, 0.0,
+            mensagem[:180],
+            "Orientação de desbloqueio de áudio/play (0:00), troca de canal para renovar sinal e alerta de grade enviado."
+        )
         baloes = [
-            f"Opa{virgula_nome}, Lucas aqui! Já tô verificando a grade de canais pra você.",
-            "Se a imagem abriu mas ficou parada em 0:00 ou sem áudio, toca no botão verde *🔊 Ativar Som* ou *▶ Assistir* no meio da tela (é uma trava padrão do navegador). Se for só um canal específico que não carregou, passa pro canal seguinte na setinha e volta pra renovar o sinal.",
-            "Qual é o nome ou número exato do canal que deu isso aí? Já deixei o Jonas avisado na bancada pra checar a rota dele caso precise substituir!"
+            f"Opa{virgula_nome}, Lucas aqui! Já tô verificando a grade pra você.",
+            "Se a imagem abriu parada em 0:00 ou sem som, toca no botão de ativar o som no meio da tela que destrava na hora. Se foi só um canal que não entrou, muda pro canal vizinho e volta pra renovar o sinal.",
+            "Qual é o nome ou número exato do canal que deu isso aí? Já deixei o Jonas avisado aqui na bancada pra checar a rota dele!"
         ]
         return baloes, notificacao
 
     if any(p in texto for p in ["samsung", "lg", "roku", "tv box", "box", "fire", "smart"]):
+        registrar_evento_email(
+            "SUPORTE_TECNICO", nome, telefone, 0.0,
+            mensagem[:180],
+            "Orientação de limpeza de cache da Smart TV / TV Box e reinício elétrico de 20 segundos."
+        )
         baloes = [
-            "Boa! Em Smart TV e TV Box, quando pesa a memória do aparelho, o segredo é limpar o cache do navegador/aplicativo nas configurações da TV e desligar ela da tomada por 20 segundos (não só pelo controle remoto).",
+            "Em Smart TV e TV Box, quando pesa a memória do aparelho, o segredo é limpar o cache do navegador nas configurações da TV e desligar ela da tomada por uns 20 segundos.",
             "Me diz a marca certinha do seu aparelho e o que apareceu na tela que te guio passo a passo!"
         ]
         return baloes, notificacao
 
     if any(p in texto for p in ["pc", "computador", "notebook", "windows", "formatar", "pdv", "caixa", "impressora", "leitor"]):
+        registrar_evento_email(
+            "SUPORTE_TECNICO", nome, telefone, 0.0,
+            mensagem[:180],
+            "Triagem técnica iniciada para Windows / Sistema PDV Caixa (impressora, leitor ou desempenho)."
+        )
         baloes = [
             f"Tranquilo{virgula_nome}, vamos organizar isso! Aqui é o Lucas.",
-            "Me conta só um detalhe pra eu separar a ferramenta certa: o problema é lentidão/travamento geral do Windows ou algum erro dentro do Sistema de Caixa PDV (impressora, leitor ou banco)? Se aparecer mensagem na tela, pode mandar foto por aqui!"
+            "Me conta só um detalhe pra eu separar a ferramenta certa: o problema é lentidão no Windows ou algum erro dentro do Sistema de Caixa (impressora, leitor ou banco)? Se aparecer mensagem na tela, pode mandar foto por aqui!"
         ]
         return baloes, notificacao
 
+    registrar_evento_email(
+        "SUPORTE_TECNICO", nome, telefone, 0.0,
+        mensagem[:180],
+        "Atendimento técnico inicial aberto pelo Lucas aguardando detalhes/foto do cliente."
+    )
     baloes = [
-        f"Fala{virgula_nome}! Tudo tranquilo? Aqui é o Lucas, do suporte técnico.",
-        "Me conta o que tá acontecendo aí: é algum canal/rede oscilando, configuração na TV ou problema no computador/sistema de caixa? Pode me explicar do seu jeito (ou mandar foto da tela) que já vejo o diagnóstico pra você!"
+        f"Fala{virgula_nome}! Tudo tranquilo? Aqui é o Lucas, cuido da parte técnica.",
+        "Me conta o que tá acontecendo aí: é algum canal oscilando, configuração na TV ou algo no computador? Pode me explicar do seu jeito ou mandar foto da tela que já vejo pra você!"
     ]
     return baloes, notificacao
 
@@ -366,28 +418,28 @@ def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tip
             return (
                 "MENU_INICIAL",
                 "Controle Jonas Tech",
-                ["Jonas, manda assim com o número junto: *#liberar 5511999998888*"],
+                ["Jonas, manda assim com o número junto: #liberar 5511999998888"],
                 {}
             )
         lead_alvo = leads_col.find_one({"telefone": tel_alvo}) if leads_col is not None else None
         nome_alvo = (lead_alvo or {}).get("nome", "Cliente")
         pnome_alvo = obter_primeiro_nome(nome_alvo)
         usuario, senha, validade = gerar_credenciais_cinepro(tel_alvo, nome_alvo, 30.0, "Liberado manualmente pelo Jonas")
+        registrar_evento_email(
+            "PAGAMENTO", nome_alvo, tel_alvo, 30.0,
+            f"Liberação manual aprovada pelo Jonas • Usuário: {usuario}",
+            "Acesso de 30 dias liberado."
+        )
         msgs_cliente = [
             f"Opa{', ' + pnome_alvo if pnome_alvo else ''}! Tudo certinho, o Jonas acabou de confirmar seu pagamento aqui e já liberou o seu acesso! 🙌",
-            (
-                f"Guarda seus dados válidos até *{validade}*:\n\n"
-                f"🔗 *Link:* {LINK_PLAYER_IPTV}?u={usuario}&s={senha}\n"
-                f"👤 *Usuário:* {usuario}\n"
-                f"🔑 *Senha:* {senha}"
-            ),
-            "Se abrir direto pelo link acima já entra liberado! Em outro aparelho ou Smart TV, é só tocar em *🔐 Entrar* lá no topo e digitar esse Usuário e Senha."
+            f"Anota seus dados válidos até {validade}:\n\nUsuário: {usuario}\nSenha: {senha}\n\nLink direto: {LINK_PLAYER_IPTV}?u={usuario}&s={senha}",
+            "Se abrir direto pelo link acima já entra liberado! Em outro aparelho ou TV, é só clicar em Entrar lá no topo e colocar esse usuário e senha."
         ]
         dados_extras["envio_extra_cliente"] = {"telefone": tel_alvo, "mensagens": msgs_cliente}
         return (
             "MENU_INICIAL",
             "Controle Jonas Tech",
-            [f"Prontinho, Jonas! Gerei o usuário *{usuario}* e senha *{senha}* (válido até {validade}) e já enviei direto no WhatsApp do cliente! ✅"],
+            [f"Prontinho, Jonas! Gerei o usuário {usuario} e senha {senha} (válido até {validade}) e já enviei direto no WhatsApp do cliente! ✅"],
             dados_extras
         )
 
@@ -404,6 +456,16 @@ def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tip
             print(f"[ERRO BUSCA LEAD]: {e}")
 
     setor_atual = (lead or {}).get("setor_atual", "MENU_INICIAL")
+    dados_extras["origem"] = "VITRINE_COMERCIAL"
+
+    # Áudio recebido do cliente: pede gentilmente por texto sem parecer robô
+    if tipo_midia == "audio":
+        return (
+            setor_atual,
+            "Atendimento Jonas Tech",
+            [f"Oi{virgula_nome}! Tô na bancada aqui agora com barulho e não consigo ouvir áudio, consegue me mandar por escrito rapidinho por favor? 😊"],
+            dados_extras
+        )
 
     # 2. DETECTOR INTELIGENTE DE COMPROVANTE PIX (OCR/PDF + BLINDAGEM)
     palavras_comprovante = [
@@ -418,7 +480,7 @@ def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tip
         return (
             setor_atual,
             "Camila" if setor_atual != "SETOR_3_COMERCIAL" else "Marcos",
-            [f"Show{virgula_nome}! Me manda aqui a foto ou o PDF do comprovante rapidinho pra eu validar a transferência em nome do *{TITULAR_CONTA}* e já liberar o seu acesso na hora! 😊"],
+            [f"Show{virgula_nome}! Me manda aqui a foto ou o PDF do comprovante rapidinho pra eu confirmar a transferência em nome de {TITULAR_CONTA} e já liberar pra você na hora 😊"],
             dados_extras
         )
 
@@ -445,6 +507,11 @@ def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tip
 
             if setor_atual == "SETOR_3_COMERCIAL" or analise["valor"] >= 150:
                 codigo_lic = f"JT-{random.randint(10000, 99999)}"
+                registrar_evento_email(
+                    "PAGAMENTO", nome, telefone, analise["valor"],
+                    f"Comercial / Sistemas • Código {codigo_lic}",
+                    "Pagamento confirmado automaticamente pelo Marcos."
+                )
                 dados_extras["status_pagamento"] = "APROVADO_AUTOMATICO"
                 dados_extras["valor_pago"] = analise["valor"]
                 dados_extras["notificacao_jonas"] = (
@@ -457,13 +524,18 @@ def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tip
                     "PAGAMENTO_RECEBIDO",
                     "Marcos",
                     [
-                        f"Perfeito{virgula_nome}! Acabei de conferir seu comprovante aqui em nome de *{TITULAR_CONTA}*, pagamento confirmado certinho! Muito obrigado pela parceria! 🤝",
-                        f"Seu código de ativação comercial é *{codigo_lic}*. Já notifiquei o Jonas no celular dele agora mesmo com prioridade máxima pra te entregar os arquivos oficiais e acompanhar a sua implantação!"
+                        f"Perfeito{virgula_nome}! Acabei de conferir seu comprovante aqui em nome de {TITULAR_CONTA}, pagamento confirmado certinho! Muito obrigado pela parceria 🤝",
+                        f"Seu código de ativação comercial é {codigo_lic}. Já avisei o Jonas no celular dele agora mesmo pra te entregar os arquivos e acompanhar a sua instalação!"
                     ],
                     dados_extras
                 )
 
             usuario, senha, validade = gerar_credenciais_cinepro(telefone, nome, analise["valor"], texto_comprovante)
+            registrar_evento_email(
+                "PAGAMENTO", nome, telefone, analise["valor"],
+                f"Assinatura 30 Dias • Usuário {usuario}",
+                "Comprovante validado pela Camila e login liberado."
+            )
             dados_extras["status_pagamento"] = "APROVADO_AUTOMATICO"
             dados_extras["usuario_cinepro"] = usuario
             dados_extras["notificacao_jonas"] = (
@@ -478,19 +550,13 @@ def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tip
                 "PAGAMENTO_RECEBIDO",
                 "Camila",
                 [
-                    f"Opa{virgula_nome}! Acabei de validar seu comprovante aqui em nome de *{TITULAR_CONTA}*, pagamento confirmado com sucesso! Muito obrigada pela confiança! 🙌",
-                    (
-                        f"Já criei e liberei o seu acesso completo válido até *{validade}*! Guarda aí seus dados:\n\n"
-                        f"🔗 *Link:* {LINK_PLAYER_IPTV}?u={usuario}&s={senha}\n"
-                        f"👤 *Usuário:* {usuario}\n"
-                        f"🔑 *Senha:* {senha}"
-                    ),
-                    "Se abrir direto por esse link acima ele já entra liberado na hora! E se abrir em outro aparelho ou Smart TV, é só clicar no botão *🔐 Entrar* lá no topo da tela e digitar esse seu Usuário e Senha que libera os 30 dias completos sem relógio de teste!"
+                    f"Oi{virgula_nome}! Acabei de conferir seu comprovante aqui em nome de {TITULAR_CONTA}, pagamento confirmado certinho! Muito obrigada pela confiança 😊",
+                    f"Já deixei seu acesso completo liberado até {validade}! Anota seus dados pra entrar:\n\nUsuário: {usuario}\nSenha: {senha}\n\nLink direto: {LINK_PLAYER_IPTV}?u={usuario}&s={senha}",
+                    "Tocando nesse link acima já entra liberado na hora! Se for abrir na TV ou em outro aparelho, é só clicar em Entrar lá no topo da tela e colocar esse usuário e senha, tá bom? Qualquer coisa me chama!"
                 ],
                 dados_extras
             )
 
-        # Não deu leitura automática completa: encaminha pro Jonas validar no banco
         dados_extras["status_pagamento"] = "AGUARDANDO_CONFERENCIA_JONAS"
         dados_extras["notificacao_jonas"] = (
             f"⚠️ *COMPROVANTE PARA CONFERIR!*\n"
@@ -503,7 +569,7 @@ def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tip
             "Camila" if setor_atual != "SETOR_3_COMERCIAL" else "Marcos",
             [
                 f"Recebi seu arquivo aqui{virgula_nome}! 🙏",
-                f"Como alguns dados da imagem não ficaram nítidos pra leitura automática, já encaminhei agora mesmo pro celular do Jonas confirmar no {BANCO_RECEBEDOR} e te liberar o usuário e senha em instantes!"
+                f"Como alguns dados da imagem não ficaram nítidos pra leitura automática, já encaminhei agora mesmo pro Jonas confirmar no {BANCO_RECEBEDOR} e te liberar o acesso em instantes!"
             ],
             dados_extras
         )
@@ -531,7 +597,7 @@ def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tip
             baloes, notif = diagnosticar_suporte_lucas(pnome, nome, telefone, mensagem, tipo_midia, texto_comprovante)
             if notif:
                 dados_extras["notificacao_jonas"] = notif
-        elif any(p in texto for p in ["1", "tv", "iptv", "cinepro", "teste", "testar", "futebol", "canais", "filme", "série", "serie", "jogo"]):
+        elif any(p in texto for p in ["1", "tv", "iptv", "cinepro", "teste", "testar", "futebol", "canais", "filme", "série", "serie", "jogo", "pacote vip"]):
             novo_setor = "SETOR_1_CINEPRO"
             atendente = "Camila"
             agora = agora_brasilia()
@@ -540,23 +606,14 @@ def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tip
             dados_extras["horario_regua_expira"] = (agora + timedelta(hours=2)).strftime("%Y-%m-%d %H:%M:%S")
             baloes = [
                 f"Oi{virgula_nome}! Tudo bom? Aqui é a Camila 😊 Já deixei liberado seu teste grátis de 2 horas pra você ver a qualidade!",
-                (
-                    f"É só tocar nesse link aqui pra abrir:\n{LINK_PLAYER_IPTV}\n\n"
-                    "Pega direto no celular, computador ou Smart TV, com todos os canais, filmes novos e jogos ao vivo. Abre aí rapidinho e me conta se rodou lisinho!"
-                )
+                f"É só tocar nesse link aqui pra abrir:\n{LINK_PLAYER_IPTV}\n\nPega direto no celular, computador ou Smart TV, com filmes novos e jogos ao vivo. Abre aí rapidinho e me conta se rodou lisinho!"
             ]
-        elif any(p in texto for p in ["3", "venda", "comercial", "comprar", "preco", "preço", "sistema", "pdv", "caixa", "estoque", "150", "quanto custa", "valor", "tabela", "robô", "robo", "mercadinho", "loja", "comercio", "comércio"]):
+        elif any(p in texto for p in ["3", "venda", "comercial", "comprar", "preco", "preço", "sistema", "pdv", "caixa", "estoque", "150", "quanto custa", "valor", "tabela", "robô", "robo", "mercadinho", "loja", "comercio", "comércio", "orçamento", "orcamento", "serviços", "servicos", "sistemas"]):
             novo_setor = "SETOR_3_COMERCIAL"
             atendente = "Marcos"
             baloes = [
-                f"Opa{virgula_nome}! Tudo bem? Aqui é o Marcos, consultor comercial da equipe do Jonas.",
-                (
-                    "Mais do que vender ferramenta solta, meu papel aqui é entender onde você perde tempo ou dinheiro hoje pra te propor a melhor melhoria:\n\n"
-                    "• *Tem comércio/loja?* Nosso *PDV Caixa & Estoque* (R$ 150 único, sem mensalidade) acaba com furo de estoque e fila.\n"
-                    "• *Perde vendas no WhatsApp?* Implantamos *Atendimento Automático 24h* (R$ 250).\n"
-                    "• *PCs travando a operação?* Aplicamos o *Windows Boost PRO* (R$ 150) sem você gastar trocando máquina.\n\n"
-                    "Me conta rapidinho: hoje você busca melhorar seu comércio, seu atendimento ou seu computador?"
-                )
+                f"Opa{virgula_nome}! Tudo bem? Aqui é o Marcos, trabalho na parte comercial junto com o Jonas.",
+                "Me conta rapidinho o que você tá buscando melhorar hoje pra eu te indicar o caminho certo: é sistema de caixa e estoque sem mensalidade pro seu comércio (R$ 150), deixar computador lento voando de novo ou colocar atendimento automático no WhatsApp?"
             ]
         elif any(p in texto for p in ["4", "jonas", "humano", "pessoa", "dono"]):
             novo_setor = "SETOR_4_JONAS_HUMANO"
@@ -565,7 +622,7 @@ def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tip
             disparar_alerta_cliente_quente(telefone, nome, "CLIENTE SOLICITOU ATENDIMENTO HUMANO COM O JONAS")
             baloes = [
                 f"Pode deixar{virgula_nome}! Já dei um toque no celular pessoal do Jonas pra ele assumir nossa conversa aqui.",
-                "Se quiser, já pode ir mandando sua dúvida ou áudio aqui que assim que ele soltar o atendimento ali já te responde direto, combinado?"
+                "Se quiser, já pode ir mandando sua dúvida por escrito que assim que ele pegar no aparelho já te responde direto, combinado?"
             ]
         else:
             novo_setor = "MENU_INICIAL"
@@ -615,13 +672,13 @@ def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tip
             baloes = montar_bloco_pix(pnome, valor_str)
         elif any(p in texto for p in ["loja", "mercado", "mercadinho", "adega", "bar", "lanchonete", "comercio", "comércio", "estoque", "caderno", "planilha", "caixa", "pdv"]):
             baloes = [
-                f"Olha que excelente oportunidade de melhoria aí{virgula_nome}: quem troca caderno/planilha ou sistema pago por mês pelo nosso *PDV Frente de Caixa* economiza mais de R$ 1.200 já no primeiro ano, porque você paga *R$ 150 uma única vez* e é seu pra sempre!",
-                "Ele já controla entrada e saída de estoque na hora, aceita leitor de código de barras e mostra o QR Code PIX na tela. E se o computador do balcão estiver lento, consigo fazer uma proposta especial juntando *PDV + Otimização completa da máquina*.\n\nPrefere fechar só o PDV de R$ 150 hoje ou quer ver a condição do pacote completo?"
+                f"Olha que economia boa dá pra fazer aí{virgula_nome}: quem sai do caderno ou de sistema com mensalidade pro nosso PDV Frente de Caixa economiza mais de R$ 1.200 no ano, porque você paga R$ 150 uma única vez e fica seu pra sempre!",
+                "Ele já controla entrada e saída de estoque na hora, aceita leitor de código de barras e mostra o PIX na tela. E se o computador do balcão estiver lento, consigo juntar PDV + Otimização completa da máquina num pacote especial.\n\nPrefere fechar só o PDV de R$ 150 hoje ou quer ver a condição do pacote completo?"
             ]
         elif any(p in texto for p in ["combo", "pacote", "proposta", "melhoria", "desconto", "tudo", "completo"]):
             baloes = [
                 f"Montei a nossa melhor proposta de modernização pra você{virgula_nome}:",
-                "Fazendo separado sairia R$ 550 (PDV R$ 150 + Windows Boost PRO R$ 150 + Automação WhatsApp R$ 250). Fechando o *Combo Modernização 3 em 1* hoje, eu consigo validar pra você por *R$ 350 pagamento único* — economia real de R$ 200 na hora!",
+                "Fazendo separado sairia R$ 550 (PDV R$ 150 + Windows Boost PRO R$ 150 + Automação WhatsApp R$ 250). Fechando o Combo Modernização 3 em 1 hoje, consigo validar pra você por R$ 350 pagamento único — economia de R$ 200 na hora!",
                 "Quer que eu já valide essa condição de R$ 350 e te mande a chave PIX oficial?"
             ]
         else:
@@ -650,18 +707,70 @@ def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tip
 def healthcheck():
     return jsonify({
         "status": "online",
-        "servico": "Central Resolutiva Multissetorial 24/7 - Jonas Tech Solutions",
-        "versao": "4.0_AGENTES_RESOLUTIVOS",
+        "servico": "Central Humana & Relatórios 24/7 - Jonas Tech Solutions",
+        "versao": "5.0_VITRINE_AUSENCIA_EMAIL",
         "banco": "MongoDB Atlas Conectado",
         "recursos_ativos": [
-            "1. Camila: PIX Blindado + Validação OCR/PDF + Login 30 Dias",
-            "2. Lucas: Diagnóstico Técnico de Rede, Canais, Smart TV e PDV",
-            "3. Marcos: Consultor Comercial com Propostas de Melhoria e Combos",
-            "4. Endpoint /api/cinepro/login para Desbloqueio Real",
-            "5. Comandos LIGAR, DESLIGAR e #liberar pelo WhatsApp"
+            "1. Atendimento 100% Natural (Sem Menu URA)",
+            "2. Camila: PIX Blindado + OCR/PDF + Login 30 Dias",
+            "3. Lucas: Diagnóstico Técnico + Registro para E-mail",
+            "4. Marcos: Consultoria Comercial de Melhorias",
+            "5. Relatório Financeiro e Técnico (/api/relatorio-email)"
         ],
         "timestamp": agora_brasilia().strftime("%Y-%m-%d %H:%M:%S")
     }), 200
+
+
+@app.route("/api/relatorio-email", methods=["GET"])
+def api_relatorio_email():
+    hoje = agora_brasilia().strftime("%Y-%m-%d")
+    eventos_hoje = []
+    if eventos_email_col is not None:
+        try:
+            eventos_hoje = list(eventos_email_col.find({"data_dia": hoje}, {"_id": 0}))
+        except Exception as e:
+            print(f"[ERRO LER EVENTOS EMAIL]: {e}")
+
+    pagamentos = [e for e in eventos_hoje if e.get("tipo") == "PAGAMENTO"]
+    suportes = [e for e in eventos_hoje if e.get("tipo") == "SUPORTE_TECNICO"]
+    total_whatsapp_dia = sum(float(e.get("valor") or 0.0) for e in pagamentos)
+
+    total_pdv_dia = 0.0
+    total_geral_historico_pdv = 0.0
+    if vendas_pdv_col is not None:
+        try:
+            for v in vendas_pdv_col.find({}, {"_id": 0, "total_liquido": 1, "total": 1, "data_hora": 1}):
+                val = float(v.get("total_liquido") or v.get("total") or 0.0)
+                total_geral_historico_pdv += val
+                if str(v.get("data_hora") or "").startswith(hoje):
+                    total_pdv_dia += val
+        except Exception as e:
+            print(f"[ERRO LER VENDAS PDV]: {e}")
+
+    return jsonify({
+        "data_dia": hoje,
+        "gerado_em": agora_brasilia().strftime("%d/%m/%Y às %H:%M:%S"),
+        "total_whatsapp_dia": round(total_whatsapp_dia, 2),
+        "qtd_pagamentos_dia": len(pagamentos),
+        "total_pdv_dia": round(total_pdv_dia, 2),
+        "total_geral_historico_pdv": round(total_geral_historico_pdv, 2),
+        "total_acumulado_dia": round(total_whatsapp_dia + total_pdv_dia, 2),
+        "pagamentos": pagamentos,
+        "suportes": suportes,
+        "pendentes_envio": [e for e in eventos_hoje if not e.get("enviado_email")]
+    }), 200
+
+
+@app.route("/api/relatorio-email/marcar-enviado", methods=["POST"])
+def api_relatorio_marcar_enviado():
+    dados = request.get_json(silent=True) or {}
+    ids = dados.get("ids") or []
+    if ids and eventos_email_col is not None:
+        try:
+            eventos_email_col.update_many({"id_evento": {"$in": ids}}, {"$set": {"enviado_email": True}})
+        except Exception as e:
+            return jsonify({"ok": False, "erro": str(e)}), 500
+    return jsonify({"ok": True, "marcados": len(ids)}), 200
 
 
 @app.route("/api/cinepro/login", methods=["POST", "OPTIONS"])
@@ -719,7 +828,7 @@ def webhook_whatsapp():
                 "atendente_responsavel": atendente,
                 "ultima_mensagem": mensagem,
                 "resposta": resposta_consolidada,
-                "status": "EM_ATENDIMENTO_RESOLUTIVO",
+                "status": "EM_ATENDIMENTO_HUMANO",
                 "atualizado_em": agora_brasilia().strftime("%Y-%m-%d %H:%M:%S")
             }
             for k, v in extras.items():
