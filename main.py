@@ -17,6 +17,7 @@ import json
 import os
 import random
 import re
+import time
 import unicodedata
 import urllib.parse
 import urllib.request
@@ -24,6 +25,8 @@ from datetime import datetime, timedelta, timezone
 from flask import Flask, request, jsonify
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
+
+from motor_pix import gerar_payload_pix, gerar_url_qrcode_instantaneo
 
 app = Flask(__name__)
 
@@ -40,11 +43,12 @@ def habilitar_cors_total(response):
 CHAVE_PIX_OFICIAL = "324588e6-bd74-4b6d-9951-5321cc50ea5a"
 BANCO_RECEBEDOR = "Mercado Pago IP S.A."
 TITULAR_CONTA = "Jonas Mendonça"
+CIDADE_RECEBEDOR = "SAO PAULO"
 WHATSAPP_HUMANO = "(11) 96670-7293"
 
 # LINKS OFICIAIS
 LINK_PLAYER_IPTV = "https://jonasskynet-eng.github.io/cine-pro-tv-2026/"
-LINK_DEMO_PDV = "http://localhost:5055/"
+LINK_DEMO_PDV = "https://agente-whatsapp-jonas.onrender.com/pdv"
 
 # BANCO DE DADOS NA NUVEM (MONGODB ATLAS)
 USUARIO = os.getenv("MONGO_USER", "jonasskynet_db_user")
@@ -63,6 +67,10 @@ try:
     comprovantes_col = db["comprovantes_validados"]
     eventos_email_col = db["eventos_relatorio_email"]
     vendas_pdv_col = db["historico_vendas"]
+    col_vendas = db["historico_vendas"]
+    col_produtos = db["estoque_produtos"]
+    col_fechamentos = db["fechamentos_caixa"]
+    col_movimentacoes = db["movimentacoes_caixa"]
     print("[NUVEM] Conexão com MongoDB Atlas validada com sucesso!")
 except Exception as e:
     print(f"[ERRO MONGODB NUVEM] {e}")
@@ -73,6 +81,10 @@ except Exception as e:
     comprovantes_col = None
     eventos_email_col = None
     vendas_pdv_col = None
+    col_vendas = None
+    col_produtos = None
+    col_fechamentos = None
+    col_movimentacoes = None
 
 
 def agora_brasilia():
@@ -992,6 +1004,238 @@ def api_robo_ligar():
 def api_robo_desligar():
     definir_status_robo(False)
     return jsonify({"ativo": False, "status": "PAUSADO"}), 200
+
+
+# ==============================================================================
+# ROTAS DO SISTEMA COMERCIAL PDV & ESTOQUE 100% NA NUVEM (MONGODB ATLAS)
+# ==============================================================================
+
+@app.route("/pdv", methods=["GET"])
+def rota_pdv_interface_nuvem():
+    """Serve a interface completa do PDV direto da nuvem para celular, tablet ou PC."""
+    caminho = os.path.join(os.path.dirname(os.path.abspath(__file__)), "interface_pdv.html")
+    if os.path.exists(caminho):
+        with open(caminho, "r", encoding="utf-8") as f:
+            return f.read(), 200, {"Content-Type": "text/html; charset=utf-8"}
+    return "Interface PDV em atualização", 404
+
+
+@app.route("/api/produtos", methods=["GET"])
+def api_pdv_listar_produtos():
+    """Lista catálogo de produtos direto do MongoDB Atlas."""
+    try:
+        busca = (request.args.get("busca") or "").strip()
+        filtro = {}
+        if busca:
+            filtro = {"$or": [
+                {"nome": {"$regex": busca, "$options": "i"}},
+                {"sku": {"$regex": busca, "$options": "i"}},
+                {"codigo_barras": {"$regex": busca, "$options": "i"}}
+            ]}
+        docs = list(col_produtos.find(filtro, {"_id": 0}).limit(150)) if col_produtos is not None else []
+        resultado = []
+        for d in docs:
+            resultado.append({
+                "codigo_barras": d.get("sku") or d.get("codigo_barras"),
+                "sku": d.get("sku") or d.get("codigo_barras"),
+                "nome": d.get("nome"),
+                "preco_venda": float(d.get("preco_venda") or 0.0),
+                "preco_custo": float(d.get("preco_custo") or 0.0),
+                "estoque_atual": float(d.get("quantidade_estoque") or d.get("estoque_atual") or 0.0),
+                "estoque_minimo": float(d.get("estoque_minimo_alerta") or d.get("estoque_minimo") or 5.0),
+                "unidade": d.get("unidade", "UN"),
+                "categoria_nome": d.get("categoria", "Geral"),
+                "margem_lucro": float(d.get("margem_lucro_percentual") or 0.0)
+            })
+        return jsonify(resultado), 200
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
+
+@app.route("/api/produtos/<codigo>", methods=["GET"])
+def api_pdv_buscar_produto_codigo(codigo):
+    """Busca produto individual pelo código de barras ou SKU no MongoDB Atlas."""
+    try:
+        if col_produtos is None:
+            return jsonify({"erro": "Banco de dados indisponível"}), 503
+        doc = col_produtos.find_one({"$or": [{"sku": codigo}, {"codigo_barras": codigo}]}, {"_id": 0})
+        if not doc:
+            return jsonify({"erro": "Produto não encontrado"}), 404
+        return jsonify({
+            "codigo_barras": doc.get("sku") or doc.get("codigo_barras"),
+            "sku": doc.get("sku") or doc.get("codigo_barras"),
+            "nome": doc.get("nome"),
+            "preco_venda": float(doc.get("preco_venda") or 0.0),
+            "preco_custo": float(doc.get("preco_custo") or 0.0),
+            "estoque_atual": float(doc.get("quantidade_estoque") or doc.get("estoque_atual") or 0.0),
+            "unidade": doc.get("unidade", "UN")
+        }), 200
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
+
+@app.route("/api/produtos", methods=["POST"])
+def api_pdv_cadastrar_produto():
+    """Cadastra ou atualiza produto no MongoDB Atlas."""
+    try:
+        dados = request.json or {}
+        sku = str(dados.get("codigo_barras") or dados.get("sku", "")).strip()
+        nome = str(dados.get("nome", "")).strip()
+        if not sku or not nome:
+            return jsonify({"erro": "Código e Nome são obrigatórios"}), 400
+
+        pv = float(dados.get("preco_venda", 0.0))
+        pc = float(dados.get("preco_custo", 0.0))
+        margem = round(((pv - pc) / pv) * 100, 1) if pv > 0 else 0.0
+        doc = {
+            "sku": sku,
+            "codigo_barras": sku,
+            "nome": nome,
+            "preco_venda": pv,
+            "preco_custo": pc,
+            "margem_lucro_percentual": margem,
+            "quantidade_estoque": float(dados.get("estoque_inicial") or dados.get("quantidade_estoque") or 10.0),
+            "estoque_minimo_alerta": float(dados.get("estoque_minimo") or 5.0),
+            "unidade": dados.get("unidade", "UN"),
+            "categoria": dados.get("categoria", "Comercial"),
+            "atualizado_em": agora_brasilia().strftime("%Y-%m-%d %H:%M:%S")
+        }
+        col_produtos.update_one({"$or": [{"sku": sku}, {"codigo_barras": sku}]}, {"$set": doc}, upsert=True)
+        return jsonify({"sucesso": True, "produto": doc}), 201
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
+
+@app.route("/api/venda", methods=["POST"])
+def api_pdv_registrar_venda():
+    """Registra venda no Atlas, dá baixa no estoque e gera cupom."""
+    try:
+        dados = request.json or {}
+        itens = dados.get("itens") or []
+        if not itens:
+            return jsonify({"erro": "O carrinho está vazio"}), 400
+
+        forma_pgto = dados.get("forma_pagamento", "DINHEIRO")
+        total_liquido = 0.0
+        itens_formatados = []
+
+        for item in itens:
+            cod = str(item.get("codigo_barras") or item.get("sku"))
+            qtd = float(item.get("quantidade", 1))
+            preco_un = float(item.get("preco_unitario", 0))
+            subtotal = round(qtd * preco_un, 2)
+            total_liquido += subtotal
+
+            itens_formatados.append({
+                "codigo_barras": cod,
+                "nome": item.get("nome"),
+                "quantidade": qtd,
+                "preco_unitario": preco_un,
+                "subtotal": subtotal
+            })
+
+            # Dá baixa imediata no estoque no Atlas
+            if col_produtos is not None:
+                col_produtos.update_one(
+                    {"$or": [{"sku": cod}, {"codigo_barras": cod}]},
+                    {"$inc": {"quantidade_estoque": -qtd}}
+                )
+
+        cod_venda = f"VD-{int(time.time())}"
+        data_hora = agora_brasilia().strftime("%d/%m/%Y %H:%M:%S")
+        valor_pago = float(dados.get("valor_pago") or total_liquido)
+        troco = max(0.0, valor_pago - total_liquido) if forma_pgto == "DINHEIRO" else 0.0
+
+        doc_venda = {
+            "codigo_venda": cod_venda,
+            "data_hora": data_hora,
+            "total_bruto": round(total_liquido, 2),
+            "total_liquido": round(total_liquido, 2),
+            "forma_pagamento": forma_pgto,
+            "valor_pago": round(valor_pago, 2),
+            "troco": round(troco, 2),
+            "itens": itens_formatados,
+            "origem": "PDV_NUVEM_WEB"
+        }
+
+        if col_vendas is not None:
+            col_vendas.insert_one(doc_venda)
+
+        # Registra automaticamente no relatório de e-mail diário do Jonas
+        registrar_evento_email(
+            "VENDA_PDV", "Cliente Balcão", "(Balcão)", total_liquido,
+            f"Venda #{cod_venda} ({len(itens)} itens)",
+            f"Pagamento em {forma_pgto} no PDV Nuvem"
+        )
+
+        doc_venda.pop("_id", None)
+        return jsonify(doc_venda), 201
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
+
+@app.route("/api/caixa/status", methods=["GET"])
+def api_pdv_caixa_status():
+    """Retorna faturamento e resumo de vendas do dia no MongoDB Atlas."""
+    try:
+        hoje_str = agora_brasilia().strftime("%d/%m/%Y")
+        vendas = list(col_vendas.find({"data_hora": {"$regex": f"^{hoje_str}"}}, {"_id": 0})) if col_vendas is not None else []
+        total_dinheiro = sum(v.get("total_liquido", 0) for v in vendas if v.get("forma_pagamento") == "DINHEIRO")
+        total_pix = sum(v.get("total_liquido", 0) for v in vendas if v.get("forma_pagamento") == "PIX")
+        total_debito = sum(v.get("total_liquido", 0) for v in vendas if "DEBITO" in v.get("forma_pagamento", ""))
+        total_credito = sum(v.get("total_liquido", 0) for v in vendas if "CREDITO" in v.get("forma_pagamento", "") or "CARTAO" in v.get("forma_pagamento", ""))
+        total_geral = sum(v.get("total_liquido", 0) for v in vendas)
+
+        return jsonify({
+            "sessao_id": 1,
+            "aberto_em": f"{hoje_str} 08:00:00",
+            "saldo_inicial": 100.0,
+            "total_vendas": round(total_geral, 2),
+            "total_dinheiro": round(total_dinheiro, 2),
+            "total_pix": round(total_pix, 2),
+            "total_cartao_debito": round(total_debito, 2),
+            "total_cartao_credito": round(total_credito, 2),
+            "qtd_vendas": len(vendas),
+            "status": "ABERTO"
+        }), 200
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
+
+@app.route("/api/caixa/fechar", methods=["POST"])
+def api_pdv_caixa_fechar():
+    """Fecha o caixa e salva no MongoDB Atlas."""
+    try:
+        hoje_str = agora_brasilia().strftime("%d/%m/%Y %H:%M:%S")
+        doc_fechamento = {
+            "fechado_em": hoje_str,
+            "operador": "Jonas Mendonça",
+            "status": "FECHADO_COM_SUCESSO"
+        }
+        if col_fechamentos is not None:
+            col_fechamentos.insert_one(doc_fechamento)
+        return jsonify({"sucesso": True, "fechamento": doc_fechamento}), 200
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
+
+@app.route("/api/pix/gerar", methods=["POST"])
+def api_pdv_pix_gerar():
+    """Gera QR Code PIX dinâmico com chave oficial do Mercado Pago."""
+    try:
+        dados = request.json or {}
+        valor = float(dados.get("valor", 0.01))
+        payload = gerar_payload_pix(CHAVE_PIX_OFICIAL, TITULAR_CONTA, CIDADE_RECEBEDOR, valor)
+        url_qr = gerar_url_qrcode_instantaneo(payload, 300)
+        return jsonify({
+            "payload_copia_cola": payload,
+            "qrcode_url": url_qr,
+            "chave_pix": CHAVE_PIX_OFICIAL,
+            "titular": TITULAR_CONTA,
+            "valor": valor
+        }), 200
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
 
 
 if __name__ == "__main__":
