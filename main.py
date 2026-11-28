@@ -698,23 +698,23 @@ def gerar_resposta_fallback_inteligente(setor, pnome, mensagem_usuario):
         if setor == "SETOR_1_CINEPRO":
             return [
                 f"Show{virgula_nome}! 😊 Aqui é a Camila. O link gratuito com os 200 canais abertos + 40 rádios já está liberado aqui:",
-                f"{LINK_PLAYER_IPTV}\n\nSe quiser liberar um *Teste grátis de 2 horas* do pacote completo (800 canais) ou saber dos planos, é só pedir!"
+                f"{LINK_PLAYER_IPTV}\n\nSe quiser liberar um *Teste grátis de 2 horas* do pacote VIP completo (+1.402 canais extras — 1.602 ao todo) ou saber dos planos, é só pedir!"
             ]
         elif setor == "SETOR_3_COMERCIAL":
             return [
                 f"Show{virgula_nome}! Aqui é o Marcos, gerente comercial. Tô por aqui pra fechar a melhor condição pra você:",
-                "Temos *2 meses por R$ 50*, *3 meses por R$ 70* ou *1 Ano por R$ 240* (R$ 20/mês). Qual desses você quer garantir hoje?"
+                "Temos *2 meses por R$ 50*, *3 meses por R$ 70*, *4 meses por R$ 90* ou *1 Ano por R$ 220* (ou *R$ 200 no PIX à vista*). Qual desses você quer garantir hoje?"
             ]
         return [
             f"Opa{virgula_nome}, tudo tranquilo por aqui e com você? 😊",
-            "Posso abrir nossos *200 canais e 40 rádios gratuitos*, liberar um *Teste 2h do pacote completo* ou te passar para o *Gerente Marcos* negociar um pacote de 2 meses, 3 meses ou 1 Ano!"
+            "Posso abrir nossos *200 canais e 40 rádios gratuitos*, liberar um *Teste 2h do pacote VIP (1.602 canais)* ou te passar para o *Gerente Marcos* negociar um pacote de 2 meses, 3 meses ou 1 Ano!"
         ]
 
     # Fallback contextual por setor
     if setor == "SETOR_1_CINEPRO":
         return [
             f"Entendi perfeitamente{virgula_nome}! 😊 Aqui é a Camila.",
-            "Temos *200 canais gratuitos + 40 rádios ao vivo* direto no link, *Teste grátis de 2 horas* e o pacote completo com *800 canais* (R$ 30/mês).",
+            "Temos *200 canais gratuitos + 40 rádios ao vivo* direto no link, *Teste grátis de 2 horas* e o pacote VIP completo com *1.602 canais auditados* (R$ 30/mês).",
             f"Acesse grátis por aqui: {LINK_PLAYER_IPTV}\nSe quiser desconto em pacotes de 2 meses, 3 meses ou 1 Ano, eu chamo meu gerente Marcos na hora!"
         ]
     elif setor == "SETOR_2_SUPORTE":
@@ -725,7 +725,7 @@ def gerar_resposta_fallback_inteligente(setor, pnome, mensagem_usuario):
     elif setor == "SETOR_3_COMERCIAL":
         return [
             f"Perfeito{virgula_nome}! Sou o Marcos, gerente comercial da Central CinePro TV & Rádios.",
-            "Consigo liberar pra você promoções reais nos pacotes de *2 meses (R$ 50)*, *3 meses (R$ 70)*, *6 meses (R$ 130)* e *1 Ano (R$ 240 — sai a R$ 20/mês)*, todos com os 800 canais + 40 rádios.",
+            "Consigo liberar pra você promoções reais nos pacotes de *2 meses (R$ 50)*, *3 meses (R$ 70)*, *4 meses (R$ 90)*, *6 meses (R$ 130)*, *8 meses (R$ 160)* e *1 Ano (R$ 220 — sai a R$ 18,33/mês)*, todos com os *1.602 canais + 40 rádios*.",
             "Qual desses planos você quer fechar ou negociar agora?"
         ]
 
@@ -1243,7 +1243,7 @@ def ativar_teste_2h_camila(pnome, nome, telefone, lead):
             f"Vi aqui que você já retirou um *Teste de 2 horas* recentemente neste número{virgula_nome} 😊",
             (
                 f"Mas os *200 canais abertos + 40 rádios ao vivo* continuam 100% gratuitos no link:\n{LINK_PLAYER_IPTV}\n\n"
-                "E se quiser liberar os *800 canais completos* hoje, o plano mensal é *R$ 30,00* ou posso chamar o *Gerente Marcos* para negociar 2 meses, 3 meses ou 1 Ano com desconto!"
+                "E se quiser liberar os *1.602 canais do pacote VIP completo (+1.402 extras)* hoje, o plano mensal é *R$ 30,00* ou posso chamar o *Gerente Marcos* para negociar 2 meses, 3 meses ou 1 Ano com desconto!"
             )
         ]
         return baloes, dados_extras
@@ -1590,7 +1590,7 @@ def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tip
             elif any(p in texto_sem_acento for p in ["radio", "radios", "musica", "fm", "sertanejo"]):
                 baloes = [
                     f"Oi{virgula_nome}! Aqui é a Camila 😊 Temos *40 rádios ao vivo gratuitas* (junto com os *200 canais de TV Aberta e Notícias*)!",
-                    f"É só tocar nesse link aqui e clicar na aba *📻 Rádios & Música*:\n{LINK_PLAYER_IPTV}\n\nSe quiser também fazer um *Teste de 2 horas* do pacote completo (800 canais) ou saber os planos, é só pedir!"
+                    f"É só tocar nesse link aqui e clicar na aba *📻 Rádios & Música*:\n{LINK_PLAYER_IPTV}\n\nSe quiser também fazer um *Teste de 2 horas* do pacote VIP completo (*1.602 canais ao vivo*) ou saber os planos, é só pedir!"
                 ]
             else:
                 dados_extras["teste_iniciado_em"] = agora_brasilia().strftime("%Y-%m-%d %H:%M:%S")
@@ -1598,7 +1598,7 @@ def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tip
                     f"Oi{virgula_nome}! Tudo bom? Aqui é a Camila 😊 Separei nossa *Central CinePro TV & Rádios* para você:",
                     (
                         f"📺 *200 Canais Abertos + 40 Rádios ao vivo GRÁTIS* direto no navegador:\n{LINK_PLAYER_IPTV}\n\n"
-                        "⏱️ Quer testar tudo antes de assinar? Posso liberar agora mesmo um *Teste Gratuito de 2 horas* do pacote completo (*800 canais* — R$ 30,00/mês)!\n"
+                        "⏱️ Quer testar tudo antes de assinar? Posso liberar agora mesmo um *Teste Gratuito de 2 horas* do pacote VIP completo (*1.602 canais auditados* — R$ 30,00/mês)!\n"
                         "É só me pedir *teste 2h*, *rádios* ou perguntar os valores!"
                     )
                 ]
@@ -1659,13 +1659,13 @@ def processar_mensagem_inteligente(telefone, nome, mensagem, midia_url=None, tip
                 ]
             elif any(p in texto_sem_acento for p in ["globo", "sbt", "record", "band", "sportv", "premiere", "netflix", "futebol", "jogo", "fechado"]):
                 baloes = [
-                    f"Boa pergunta{virgula_nome}! Os *200 canais gratuitos + 40 rádios* já trazem TV Aberta e Notícias de graça no link, sem canais pagos fechados.",
-                    f"Para liberar os canais fechados, filmes e esportes (*800 canais completos*), você pode pedir agora mesmo um *Teste grátis de 2 horas* ou assinar por *R$ 30,00/mês*!\nLink: {LINK_PLAYER_IPTV}"
+                    f"Boa pergunta{virgula_nome}! Os *200 canais gratuitos + 40 rádios* já trazem TV Aberta e Notícias de graça no link.",
+                    f"Para liberar a grade VIP com mais *+1.402 canais extras auditados* (filmes, séries, esportes livres, infantis e TVs regionais — *1.602 canais ao todo*), peça um *Teste grátis de 2 horas* ou assine por *R$ 30,00/mês*!\nLink: {LINK_PLAYER_IPTV}"
                 ]
             elif any(p in texto_sem_acento for p in ["abriu", "funcionou", "top", "bom", "gostei", "rodou", "show", "otimo", "sim", "deu certo"]):
                 baloes = [
                     f"Que massa{virgula_nome}, fico feliz que rodou liso aí! 😄",
-                    "Se quiser experimentar os *800 canais do pacote completo* por *2 horas grátis* ou chamar o *Gerente Marcos* pra ver promoção de 2 meses, 3 meses ou 1 Ano, é só falar!"
+                    "Se quiser experimentar os *1.602 canais do pacote VIP completo* por *2 horas grátis* ou chamar o *Gerente Marcos* pra ver promoção de 2 meses, 3 meses ou 1 Ano, é só falar!"
                 ]
             else:
                 baloes = gerar_resposta_fallback_inteligente("SETOR_1_CINEPRO", pnome, mensagem)
@@ -2174,7 +2174,8 @@ def api_status_servidor_cinepro():
     return jsonify({
         "ativo": True,
         "modo": "VIP_NUVEM" if canais_vip else "GRATUITO_200",
-        "docker": bool(canais_vip),
+        "docker": False,
+        "vip_nuvem": bool(canais_vip),
         "requer_chave": True,
         "qtd_vip_extras": len(canais_vip),
         "timestamp": agora_brasilia().strftime("%Y-%m-%d %H:%M:%S")

@@ -205,7 +205,7 @@ header{background:linear-gradient(180deg,rgba(0,0,0,0.96) 0%,rgba(20,20,20,0.92)
         </div>
 
         <div class="header-controls">
-            <button type="button" id="btnModoComercial" class="btn-ui" onclick="acaoBotaoModoComercial()" style="background:rgba(245,158,11,0.16); border-color:rgba(245,158,11,0.5); color:#fde68a;" title="Modo Degustação Gratuita — Clique para liberar o Pacote VIP Completo">🎁 Degustação (200) • Liberar +800 VIP</button>
+            <button type="button" id="btnModoComercial" class="btn-ui" onclick="acaoBotaoModoComercial()" style="background:rgba(245,158,11,0.16); border-color:rgba(245,158,11,0.5); color:#fde68a;" title="Modo Gratuito (200) — Clique para liberar os +1.402 canais VIP na nuvem">🎁 Grátis (200) • Liberar +1.402 VIP</button>
             <button type="button" id="btnNetflixCatalog" class="btn-ui btn-netflix-catalog" onclick="abrirCatalogoNetflix()" title="Explorar canais por fileiras estilo Netflix">🎬 Catálogo</button>
             <button id="btnFavFilter" class="btn-ui" title="Mostrar Favoritos">⭐ Favoritos</button>
             <button id="btnQrRemote" class="btn-ui" style="background: rgba(16, 185, 129, 0.14); border-color: rgba(16, 185, 129, 0.4); color: #6ee7b7;" title="Controlar pelo Celular">📱 Controle</button>
@@ -398,7 +398,7 @@ header{background:linear-gradient(180deg,rgba(0,0,0,0.96) 0%,rgba(20,20,20,0.92)
                     <option value="discovery">🔬 Discovery (26)</option>
                     <option value="religiosos">⛪ Religiosos (32)</option>
                     <option value="musica">📻 Rádios & Música (104)</option>
-                    <option value="vip">⭐ VIP Fibra (43)</option>
+                    <option value="vip">👑 Lista VIP (+1.402)</option>
                     <option value="shows">🎸 Shows (104)</option>
                     <option value="historia">📜 Documentários (37)</option>
                     <option value="comedia">😂 Comédia (53)</option>
@@ -409,7 +409,7 @@ header{background:linear-gradient(180deg,rgba(0,0,0,0.96) 0%,rgba(20,20,20,0.92)
             <!-- BARRA DE CATEGORIAS RÁPIDAS CINEPRO TV -->
             <div id="quickCatPills" style="display:flex; gap:6px; padding:6px 10px; background:#0c1322; border-bottom:1px solid #1e293b; overflow-x:auto; scrollbar-width:none; -webkit-overflow-scrolling:touch; align-items:center; flex-shrink:0;">
                 <button type="button" class="q-pill active" data-cat="all" data-label="⭐ Todos" onclick="selecionarCategoriaDireta('all', this)" style="flex:0 0 auto; background:#10b981; color:#060913; border:1px solid #34d399; padding:5px 12px; border-radius:14px; font-size:11px; font-weight:800; cursor:pointer;">⭐ Todos</button>
-                <button type="button" class="q-pill" data-cat="vip" data-label="🦊 Fox & VIP" onclick="selecionarCategoriaDireta('vip', this)" style="flex:0 0 auto; background:linear-gradient(135deg, #f59e0b, #d97706); color:#ffffff; border:1px solid #fbbf24; padding:5px 12px; border-radius:14px; font-size:11px; font-weight:800; cursor:pointer; box-shadow:0 0 8px rgba(245,158,11,0.35);">🦊 Fox & VIP</button>
+                <button type="button" class="q-pill" data-cat="vip" data-label="👑 Lista VIP" onclick="selecionarCategoriaDireta('vip', this)" style="flex:0 0 auto; background:linear-gradient(135deg, #f59e0b, #d97706); color:#ffffff; border:1px solid #fbbf24; padding:5px 12px; border-radius:14px; font-size:11px; font-weight:800; cursor:pointer; box-shadow:0 0 8px rgba(245,158,11,0.35);">👑 Lista VIP</button>
                 <button type="button" class="q-pill" data-cat="filmes" data-label="🎬 Filmes" onclick="selecionarCategoriaDireta('filmes', this)" style="flex:0 0 auto; background:#1e293b; color:#cbd5e1; border:1px solid #334155; padding:5px 10px; border-radius:14px; font-size:11px; font-weight:700; cursor:pointer;">🎬 Filmes</button>
                 <button type="button" class="q-pill" data-cat="series" data-label="🍿 Séries 24h" onclick="selecionarCategoriaDireta('series', this)" style="flex:0 0 auto; background:#1e293b; color:#cbd5e1; border:1px solid #334155; padding:5px 10px; border-radius:14px; font-size:11px; font-weight:700; cursor:pointer;">🍿 Séries 24h</button>
                 <button type="button" class="q-pill" data-cat="esportes" data-label="⚽ Esportes" onclick="selecionarCategoriaDireta('esportes', this)" style="flex:0 0 auto; background:#1e293b; color:#cbd5e1; border:1px solid #334155; padding:5px 10px; border-radius:14px; font-size:11px; font-weight:700; cursor:pointer;">⚽ Esportes</button>
@@ -1195,6 +1195,7 @@ header{background:linear-gradient(180deg,rgba(0,0,0,0.96) 0%,rgba(20,20,20,0.92)
         let NUVEM_PROXY_ATIVO = false;
         let NUVEM_PROXY_ENDPOINT = 'https://cinepro-tv-proxy.jonasskynet.workers.dev/?url=';
         let SERVIDOR_DOCKER_VIP = false;
+        let VIP_NUVEM_ATIVO = false;
         let REQUER_CHAVE_VIP = false;
         let VIP_DESBLOQUEADO = false;
         let CANAIS_VIP_EXTRAS_CACHE = [];
@@ -1245,6 +1246,11 @@ header{background:linear-gradient(180deg,rgba(0,0,0,0.96) 0%,rgba(20,20,20,0.92)
             if (SERVIDOR_DOCKER_VIP) {
                 pill.className = 'health-pill';
                 pill.textContent = '🐳 VIP Completo';
+                return;
+            }
+            if (VIP_NUVEM_ATIVO && VIP_DESBLOQUEADO) {
+                pill.className = 'health-pill';
+                pill.textContent = '👑 VIP Nuvem';
                 return;
             }
             if (EH_AMBIENTE_LOCAL || LOCAL_PROXY_ATIVO) {
@@ -1427,6 +1433,7 @@ header{background:linear-gradient(180deg,rgba(0,0,0,0.96) 0%,rgba(20,20,20,0.92)
                 return false;
             }
         }
+        window.carregarCanaisExtrasVip = carregarCanaisExtrasVip;
 
         async function conectarServidorVipDocker() {
             if (!window.location.protocol.startsWith('http')) return;
@@ -1437,17 +1444,28 @@ header{background:linear-gradient(180deg,rgba(0,0,0,0.96) 0%,rgba(20,20,20,0.92)
                 if (!data || !data.ativo) return;
 
                 SERVIDOR_DOCKER_VIP = !!data.docker || data.modo === 'VIP_DOCKER';
+                VIP_NUVEM_ATIVO = !!data.vip_nuvem || data.modo === 'VIP_NUVEM' || SERVIDOR_DOCKER_VIP;
                 REQUER_CHAVE_VIP = !!data.requer_chave;
                 atualizarPainelSaude();
                 if (typeof aplicarFiltros === 'function') aplicarFiltros(true);
 
                 let chaveSalva = '';
                 try { chaveSalva = (localStorage.getItem('cinepro_vip_key') || '').trim(); } catch (_) {}
+                if (!chaveSalva) {
+                    try {
+                        const assSalva = JSON.parse(localStorage.getItem('cinepro_assinatura_ativa') || '{}');
+                        if (assSalva && assSalva.usuario && (!assSalva.expira_ts || Date.now() < assSalva.expira_ts)) {
+                            chaveSalva = String(assSalva.usuario).trim();
+                        }
+                    } catch (_) {}
+                }
 
                 if (!REQUER_CHAVE_VIP || chaveSalva) {
                     const ok = await carregarCanaisExtrasVip(chaveSalva);
                     if (!ok && REQUER_CHAVE_VIP) {
                         atualizarBotaoModoComercial('🔑 Inserir Código VIP', 'chave');
+                    } else if (ok) {
+                        atualizarPainelSaude();
                     }
                 } else {
                     atualizarBotaoModoComercial('🔑 Inserir Código VIP', 'chave');
@@ -1456,7 +1474,7 @@ header{background:linear-gradient(180deg,rgba(0,0,0,0.96) 0%,rgba(20,20,20,0.92)
         }
 
         async function acaoBotaoModoComercial() {
-            if (!SERVIDOR_DOCKER_VIP) {
+            if (!SERVIDOR_DOCKER_VIP && !VIP_NUVEM_ATIVO) {
                 window.open(
                     'https://wa.me/5511966707293?text=Ol%C3%A1%2C%20Jonas!%20Testei%20a%20Degusta%C3%A7%C3%A3o%20Gr%C3%A1tis%20da%20CinePro%20TV%20e%20quero%20liberar%20o%20acesso%20VIP%20Completo!',
                     '_blank',
@@ -1967,7 +1985,7 @@ header{background:linear-gradient(180deg,rgba(0,0,0,0.96) 0%,rgba(20,20,20,0.92)
             if (resetScroll) {
                 listBody.innerHTML = '';
                 canaisRenderizadosQtd = 0;
-                if (!EH_AMBIENTE_LOCAL && !LOCAL_PROXY_ATIVO && window.location.protocol === 'https:' && (catFiltro === 'discovery' || catFiltro === 'historia' || catFiltro === 'vip' || /discovery|history|space|arte|agro|telecine|tnt|axn|band sports|ratimbum|ra tim bum/.test(termo))) {
+                if (!EH_AMBIENTE_LOCAL && !LOCAL_PROXY_ATIVO && window.location.protocol === 'https:' && (catFiltro === 'discovery' || catFiltro === 'historia' || /discovery|history|space|arte|agro|telecine|tnt|axn|band sports|ratimbum|ra tim bum/.test(termo))) {
                     listBody.innerHTML = '<div style="margin:8px 10px; padding:10px 12px; border-radius:10px; background:rgba(16,185,129,0.12); border:1px solid rgba(16,185,129,0.4); color:#d1fae5; font-size:11.5px; line-height:1.45;">📡 <b>Canais da Fibra (Discovery, History, Space, Arte 1, Band Sports, Telecine...)</b> usam servidor local por IP e a nuvem bloqueia.<br>No seu PC, ligue o servidor local (<code>abrir_no_navegador.bat</code>) e abra o Modo Casa:<div style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap;"><a href="http://localhost:8080/index.html" style="background:#10b981; color:#04101f; text-decoration:none; border-radius:6px; padding:5px 10px; font-weight:800; font-size:11px;">🟢 Abrir Modo Casa (localhost:8080)</a></div></div>';
                 }
             }
@@ -3212,7 +3230,7 @@ header{background:linear-gradient(180deg,rgba(0,0,0,0.96) 0%,rgba(20,20,20,0.92)
 
             const definicoes = [
                 { id: 'nf_rec', titulo: '🕒 Continuar Assistindo', lista: recCanais },
-                { id: 'nf_vip', titulo: '🦊 Destaques Fox & VIP', lista: disp.filter(c => c.tags && c.tags.includes('vip')) },
+                { id: 'nf_vip', titulo: '👑 Destaques Lista VIP', lista: disp.filter(c => c.tags && c.tags.includes('vip')) },
                 { id: 'nf_aberta', titulo: '🔥 Em Alta na TV Aberta', lista: disp.filter(c => c.tags && c.tags.includes('aberta')) },
                 { id: 'nf_filmes', titulo: '🎬 Cinema & Filmes 24h', lista: disp.filter(c => c.tags && c.tags.includes('filmes')) },
                 { id: 'nf_series', titulo: '🍿 Séries & Maratonas', lista: disp.filter(c => c.tags && c.tags.includes('series')) },
@@ -3618,6 +3636,10 @@ header{background:linear-gradient(180deg,rgba(0,0,0,0.96) 0%,rgba(20,20,20,0.92)
             expira_em: data.expira_em,
             expira_ts: data.expira_ts
           }));
+          try { localStorage.setItem('cinepro_vip_key', data.usuario); } catch (_) {}
+          if (typeof window.carregarCanaisExtrasVip === 'function') {
+            try { await window.carregarCanaisExtrasVip(data.usuario); } catch (_) {}
+          }
           return data;
         }
 
