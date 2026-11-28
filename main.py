@@ -248,7 +248,7 @@ def montar_bloco_pix(pnome, valor_formatado):
         f"{CHAVE_PIX_OFICIAL}",
         (
             f"Quando você colar a chave no seu banco, vai aparecer exatamente o nome do nosso titular responsável: *{TITULAR_CONTA}* ({BANCO_RECEBEDOR}) — é esse nome mesmo que aparece pra você confirmar com total segurança, viu?\n\n"
-            "⚠️ *Só um cuidado importante:* na descrição/mensagem do PIX, *deixe em branco* (não escreva TV, suporte nem nome de serviço). Assim que concluir, me manda a foto ou PDF do comprovante aqui mesmo!"
+            "⚠️ *Só um cuidado importante:* na descrição/mensagem do PIX, *deixe em branco* (não escreva nada sobre o serviço). Assim que concluir, me manda a foto ou PDF do comprovante aqui mesmo!"
         )
     ]
 
